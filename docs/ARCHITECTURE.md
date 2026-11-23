@@ -1,0 +1,112 @@
+# Architecture
+
+```
+Sources/
+├── DynamicNotch/main.swift       App entry point (starts AppDelegate)
+├── NotchMediaBridge/             Objective-C library loaded by /usr/bin/perl
+└── NotchKit/
+    ├── Core/                     Pure logic, no AppKit: fully unit-tested
+    │   ├── Presentation.swift      Activities, alerts, presentations, priority rules
+    │   ├── IslandLayout.swift      Layout engine (real or virtual notch) + the shape outline
+    │   ├── IslandMetrics.swift     Every size (mirrors DESIGN.md)
+    │   ├── NotchAppearance.swift   User size/style settings and clamping
+    │   ├── AlertQueue.swift        One alert at a time, with durations
+    │   ├── CountdownTimer.swift    Timer maths with an injected clock
+    │   ├── PowerTransitions.swift  When to show charging / low-battery alerts
+    │   ├── NowPlayingInfo.swift    Track model + media-helper message parsing
+    │   ├── SystemClassifiers.swift Call apps, headphone symbols, liquid-effect maths
+    │   ├── SystemStats.swift       Stats readings: CPU, memory, network maths and labels
+    │   ├── MeetingLinks.swift      Finds Meet, Zoom, Teams and Webex links in events
+    │   ├── ColorMath.swift         Album-art tint
+    │   ├── LauncherItem.swift      Shared feature inventory and shortcut labels
+    │   └── FeatureShortcutSelection.swift  Ordered optional feature shortcuts
+    ├── Services/                 System integrations
+    │   ├── MediaBridgeClient       Runs and restarts the media helper; parses its output
+    │   │                           and album-art tint off the main thread
+    │   ├── NowPlayingService       Track, artwork, controls, pause linger
+    │   ├── TimerService            Timer + alarm sound + App Nap guard
+    │   ├── CallMonitor             Microphone (Core Audio), camera (Core Media IO), and safe
+    │   │                           app-specific hang-up actions after a user click
+    │   ├── AudioRouteMonitor       Bluetooth headphones becoming the output
+    │   ├── PowerMonitor            IOKit power-source notifications
+    │   ├── TrayStore               Up to 30 session-only references; generated shortcuts cleaned on clear/exit
+    │   ├── ClipboardMonitor        Copied text, in memory only; skips private copies; with
+    │   │                           Text from images, reads copied pictures' text (Vision, offline)
+    │   ├── SystemAudioTap          Core Audio tap for Live music bars (macOS 14.2+), only while
+    │   │                           music plays; measures levels in memory, records nothing
+    │   ├── NotesStore              The Notes scratchpad with its formatting (RTF), saved to preferences
+    │   ├── TodoStore               The elongated layout's to-do list, saved to preferences
+    │   ├── CalendarService         EventKit: next event and 5-minute heads-ups
+    │   ├── StatsService            CPU, memory, disk and network every 2 s, only while Stats is on
+    │   ├── ShortcutsService        Lists and runs Shortcuts through /usr/bin/shortcuts
+    │   └── LevelMonitor            Volume (Core Audio) and brightness (DisplayServices) changes
+    ├── Island/
+    │   ├── IslandModel             Single source of truth: state, gestures, alerts
+    │   ├── IslandWindow            Non-activating panel + hosting view
+    │   ├── IslandWindowController  Display choice, placement, pointer routing, drags
+    │   └── LockScreenController    The Lock Screen window: shown on lock, removed on unlock
+    ├── Views/                    SwiftUI: surface (Canvas), compact, expanded, alerts, home
+    ├── Settings/                 Settings store + toolbar-style settings window
+    └── App/                      AppDelegate, menu bar item, debug hooks (debug builds only)
+```
+
+## Data flow
+
+1. Services publish state (`@Observable`).
+2. `IslandModel.presentation` combines that state with user intent (expanded, swiped, hovering,
+   dragging) through `PresentationResolver` — a pure function.
+3. `LayoutEngine` turns the presentation into geometry for the current display and settings —
+   also pure.
+4. `IslandRootView` draws the geometry. The surface is `Animatable`, so SwiftUI springs every
+   rectangle and radius together; content swaps with a blur transition.
+5. `IslandWindowController` feeds pointer positions back into the model and lets the panel take
+   the mouse only where the shape is.
+6. `SettingsStore` saves the shortcuts beside Home, in the order they were added; the grid's
+   edit mode (hold a tile) adds and removes them. `IslandModel.featureShortcuts` hides any whose feature is
+   switched off, and both the shortcuts and the grid open features through `IslandModel.open(_:)`.
+
+## Debug commands
+
+Debug builds listen for a distributed notification named `DynamicNotch.debug`. Its object is a
+command: `timer:<seconds>`, `pause`, `cancel`, `home`, `expand`, `collapse`, `charging`,
+`lowbattery`, `headphones`, `drop`, `target`, `nodrop`, `peek`, `hover`, `unhover`, `swipe`,
+`settings:<tab>`, `idle`, `dismiss`, `size:<small|medium|large>`, `welcome`,
+`dump` (writes the model state to `$TMPDIR/DynamicNotch-debug.txt`), `tray`, `mirror`,
+`trayadd:<path>:<path>`, `volume:<0-1>`, `brightness:<0-1>`, `event`, `shortcutdone`. Example:
+
+```bash
+osascript -l JavaScript -e 'ObjC.import("Foundation"); $.NSDistributedNotificationCenter.defaultCenter.postNotificationNameObjectUserInfoDeliverImmediately("DynamicNotch.debug", "charging", $(), true)'
+```
+
+## Approval hook authentication
+
+Before sending request details and again before accepting a reply, `AgentHookClient` checks
+the connected Unix socket peer's UID and kernel audit token. Security.framework validates the
+running peer against this hook executable's designated requirement: for releases, the app ID
+and the Dynamic Ledge certificate, so an updated app on disk and the older one still running
+trust each other; for ad-hoc test builds, the exact code hash. Merely occupying the socket
+pathname, matching the app's name, or running as the same user is insufficient. Unsigned or
+mismatched builds fall back to the assistant's own prompt. This does not protect a Mac
+whose app binary, assistant hook settings, or running app process has already been compromised.
+
+Approval requests retain complete review arguments separately from their short description.
+Long requests make the panel taller, never wider, up to eight lines; the rest scrolls.
+
+## Requests answered in the assistant's window
+
+Claude Code shows its own prompt while our hook waits, and keeps the hook waiting when the
+prompt is answered there. So while a Claude Code request waits, `AgentTranscriptWatch` reads the
+new lines of that session's transcript (the `transcript_path` in the request) every half second,
+on this Mac only. It first finds the newest call of the same tool with the same input that has
+no result yet (earlier runs of the same command already have theirs), then closes the request
+when that call's result appears. Nothing from the transcript is kept or sent. Settings › Coding Assistants › Close when answered
+in Claude Code (on by default) switches it off; then no transcript is opened. The hook also
+gives up if the assistant stops waiting for it (its parent process goes away). Questions and plans
+(`AskUserQuestion`, `ExitPlanMode`) have their own choices, so they never reach the notch.
+
+## Finished notices
+
+Claude Code, Codex and Cursor also get a "stop" hook (`--finished`). It sends the app only the
+assistant's name and the project folder's name, over the same authenticated socket, never waits
+for an answer, and prints nothing that changes what the assistant does. Copilot CLI and
+Antigravity have no stop hook.

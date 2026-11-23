@@ -1,0 +1,490 @@
+import Foundation
+import Observation
+
+/// Where the notch shows up.
+public enum DisplayChoice: Hashable, Sendable, Identifiable {
+    /// The built-in display if it has a notch, otherwise the main display.
+    case automatic
+    /// The display that holds the menu bar.
+    case main
+    /// Whichever display the pointer is on: the notch on the built-in screen, an island elsewhere.
+    case followPointer
+    /// One particular display, remembered by its UUID; falls back to automatic when unplugged.
+    case specific(String)
+    /// Every connected display at once. Things you open appear on the screen you're using.
+    case all
+
+    public var id: String { rawValue }
+
+    public var rawValue: String {
+        switch self {
+        case .automatic: "automatic"
+        case .main: "main"
+        case .followPointer: "followPointer"
+        case .specific(let uuid): "display:" + uuid
+        case .all: "all"
+        }
+    }
+
+    public init?(rawValue: String) {
+        switch rawValue {
+        case "automatic": self = .automatic
+        case "main": self = .main
+        case "followPointer": self = .followPointer
+        case "all": self = .all
+        default:
+            guard rawValue.hasPrefix("display:"), rawValue.count > 8 else { return nil }
+            self = .specific(String(rawValue.dropFirst(8)))
+        }
+    }
+}
+
+/// Controls how a closed notch opens. In hover mode only the opening trigger changes: once
+/// open, every control remains clickable and accessible.
+public enum NotchOpenMode: String, CaseIterable, Sendable, Identifiable {
+    case click
+    case hover
+
+    public var id: String { rawValue }
+}
+
+/// User preferences, saved to UserDefaults as soon as they change.
+@MainActor
+@Observable
+public final class SettingsStore {
+    @ObservationIgnored public let defaults: UserDefaults
+
+    public var appearance: NotchAppearance {
+        didSet {
+            // The layout engine clamps too, so out-of-range values can never reach the screen.
+            let value = appearance.clamped()
+            defaults.set(value.pitchBlack, forKey: Key.pitchBlack)
+            defaults.set(value.size.rawValue, forKey: Key.size)
+            defaults.set(value.nookLayout.rawValue, forKey: Key.nookLayout)
+            defaults.set(value.width, forKey: Key.width)
+            defaults.set(value.height, forKey: Key.height)
+            defaults.set(value.theme.rawValue, forKey: Key.theme)
+            defaults.set(value.glassTint, forKey: Key.glassTint)
+            defaults.set(value.externalStyle.rawValue, forKey: Key.externalStyle)
+            defaults.set(value.companion, forKey: Key.companion)
+        }
+    }
+
+    public var showWhenIdle: Bool { didSet { defaults.set(showWhenIdle, forKey: Key.showWhenIdle) } }
+    public var notchOpenMode: NotchOpenMode { didSet { defaults.set(notchOpenMode.rawValue, forKey: Key.notchOpenMode) } }
+    public var hoverDelay: Double {
+        didSet {
+            let clamped = max(0.1, min(0.5, (hoverDelay * 100).rounded() / 100))
+            if hoverDelay != clamped { hoverDelay = clamped }
+            defaults.set(hoverDelay, forKey: Key.hoverDelay)
+        }
+    }
+    public var collapseOnPointerExit: Bool { didSet { defaults.set(collapseOnPointerExit, forKey: Key.collapseOnPointerExit) } }
+    public var hapticsEnabled: Bool { didSet { defaults.set(hapticsEnabled, forKey: Key.haptics) } }
+    public var liquidAnimations: Bool { didSet { defaults.set(liquidAnimations, forKey: Key.liquid) } }
+    public var motionStyle: MotionStyle { didSet { defaults.set(motionStyle.rawValue, forKey: Key.motionStyle) } }
+    public var showMenuBarIcon: Bool { didSet { defaults.set(showMenuBarIcon, forKey: Key.menuBarIcon) } }
+    /// Tuck the notch away while the app in front is full screen (videos, games, slides).
+    public var hideInFullScreen: Bool { didSet { defaults.set(hideInFullScreen, forKey: Key.hideInFullScreen) } }
+    /// Keep the notch out of screenshots, recordings and screen sharing where macOS allows it.
+    public var hideFromScreenCapture: Bool { didSet { defaults.set(hideFromScreenCapture, forKey: Key.hideFromScreenCapture) } }
+    public var display: DisplayChoice { didSet { defaults.set(display.rawValue, forKey: Key.display) } }
+    public var timerSound: Bool { didSet { defaults.set(timerSound, forKey: Key.timerSound) } }
+
+    public var nowPlayingEnabled: Bool { didSet { defaults.set(nowPlayingEnabled, forKey: Key.nowPlaying) } }
+    /// Every app's music, or only the apps in `nowPlayingApps`.
+    public var nowPlayingAppMode: MediaAppFilter.Mode { didSet { defaults.set(nowPlayingAppMode.rawValue, forKey: Key.nowPlayingAppMode) } }
+    /// Bundle identifiers of the apps picked for Now Playing.
+    public var nowPlayingApps: [String] { didSet { defaults.set(nowPlayingApps, forKey: Key.nowPlayingApps) } }
+    /// Apps that played something lately, offered as choices in Settings.
+    public private(set) var recentMediaApps: RecentMediaApps { didSet { defaults.set(recentMediaApps.identifiers, forKey: Key.recentMediaApps) } }
+
+    public var mediaAppFilter: MediaAppFilter {
+        MediaAppFilter(mode: nowPlayingAppMode, allowed: Set(nowPlayingApps))
+    }
+
+    /// Coding assistants whose permission requests the notch answers. None until asked for:
+    /// switching one on adds a hook to that assistant's settings.
+    public var agentApprovals: Set<AgentKind> {
+        didSet { defaults.set(AgentKind.allCases.filter(agentApprovals.contains).map(\.rawValue), forKey: Key.agentApprovalKinds) }
+    }
+
+    /// Show a short alert when an assistant with approvals switched on finishes its work.
+    public var agentFinishedAlerts: Bool { didSet { defaults.set(agentFinishedAlerts, forKey: Key.agentFinishedAlerts) } }
+    /// Close a Claude Code request in the notch once it's answered in Claude Code, by reading the
+    /// new lines of that session's transcript while it waits.
+    public var agentWatchesTranscript: Bool { didSet { defaults.set(agentWatchesTranscript, forKey: Key.agentWatchesTranscript) } }
+    public var agentApprovalsEnabled: Bool { !agentApprovals.isEmpty }
+    /// Timed lyrics under the song, looked up on LRCLIB.
+    public var lyricsEnabled: Bool { didSet { defaults.set(lyricsEnabled, forKey: Key.lyrics) } }
+    /// The music bars follow what's playing, measured from the Mac's sound. Off by default.
+    public var liveMusicBars: Bool { didSet { defaults.set(liveMusicBars, forKey: Key.liveMusicBars) } }
+    public var timerEnabled: Bool { didSet { defaults.set(timerEnabled, forKey: Key.timer) } }
+    public var callsEnabled: Bool { didSet { defaults.set(callsEnabled, forKey: Key.calls) } }
+    public var airDropEnabled: Bool { didSet { defaults.set(airDropEnabled, forKey: Key.airDrop) } }
+    public var chargingAlertsEnabled: Bool { didSet { defaults.set(chargingAlertsEnabled, forKey: Key.charging) } }
+    public var lowBatteryAlertsEnabled: Bool { didSet { defaults.set(lowBatteryAlertsEnabled, forKey: Key.lowBattery) } }
+    public var headphoneAlertsEnabled: Bool { didSet { defaults.set(headphoneAlertsEnabled, forKey: Key.headphones) } }
+    public var trayEnabled: Bool { didSet { defaults.set(trayEnabled, forKey: Key.tray) } }
+    public var mirrorEnabled: Bool { didSet { defaults.set(mirrorEnabled, forKey: Key.mirror) } }
+    /// Keep a history of copied text (memory only, passwords skipped).
+    public var clipboardEnabled: Bool { didSet { defaults.set(clipboardEnabled, forKey: Key.clipboard) } }
+    /// Copied images have their text read on this Mac and added to Clipboard. Off by default.
+    public var clipboardReadsImages: Bool { didSet { defaults.set(clipboardReadsImages, forKey: Key.clipboardImages) } }
+    public var notesEnabled: Bool { didSet { defaults.set(notesEnabled, forKey: Key.notes) } }
+    /// Show a heads-up when a download finishes. Off until asked for: macOS asks for Downloads access.
+    public var downloadsEnabled: Bool { didSet { defaults.set(downloadsEnabled, forKey: Key.downloads) } }
+    public var remindersEnabled: Bool { didSet { defaults.set(remindersEnabled, forKey: Key.reminders) } }
+    /// Home's widgets that are switched on, in the order they appear. Home shows the first three
+    /// that have something to show.
+    public var homeWidgets: [HomeWidget] { didSet { defaults.set(homeWidgets.map(\.rawValue), forKey: Key.homeWidgets) } }
+
+    public func setHomeWidget(_ widget: HomeWidget, on: Bool) {
+        if on, !homeWidgets.contains(widget) { homeWidgets.append(widget) }
+        if !on { homeWidgets.removeAll { $0 == widget } }
+    }
+
+    /// Moves a switched-on widget one place earlier (-1) or later (+1).
+    public func moveHomeWidget(_ widget: HomeWidget, by offset: Int) {
+        guard let index = homeWidgets.firstIndex(of: widget) else { return }
+        let target = index + offset
+        guard homeWidgets.indices.contains(target) else { return }
+        homeWidgets.swapAt(index, target)
+    }
+
+    public func resetHomeWidgets() { homeWidgets = HomeWidget.defaultOrder }
+
+    /// How many unpinned copies Clipboard keeps (20, 50 or 100).
+    public var clipboardLimit: Int { didSet { defaults.set(clipboardLimit, forKey: Key.clipboardLimit) } }
+    /// The weather glance in Home's top bar. Off until asked for: it goes online.
+    public var weatherEnabled: Bool { didSet { defaults.set(weatherEnabled, forKey: Key.weather) } }
+    /// The city the weather is for, as typed.
+    public var weatherCity: String { didSet { defaults.set(weatherCity, forKey: Key.weatherCity) } }
+    /// Weather follows the Mac's location instead of the typed city.
+    public var weatherUsesLocation: Bool { didSet { defaults.set(weatherUsesLocation, forKey: Key.weatherUsesLocation) } }
+    /// Live memory and CPU beside the camera when nothing else is on, plus the Stats view.
+    /// Off until asked for, since it keeps the notch showing.
+    public var statsEnabled: Bool { didSet { defaults.set(statsEnabled, forKey: Key.stats) } }
+    /// Show music, a running timer or charging on the Lock Screen. Off until asked for: anyone at
+    /// the Mac can see it, and it relies on private window-server calls.
+    public var lockScreenEnabled: Bool { didSet { defaults.set(lockScreenEnabled, forKey: Key.lockScreen) } }
+    /// ⌃⌥ shortcuts for the launcher's tiles.
+    public var keyboardShortcutsEnabled: Bool { didSet { defaults.set(keyboardShortcutsEnabled, forKey: Key.keyboardShortcuts) } }
+    /// Look for a new version on GitHub once a day.
+    public var checksForUpdates: Bool { didSet { defaults.set(checksForUpdates, forKey: Key.checksForUpdates) } }
+    /// Automatically install verified updates found during background checks.
+    public var installsUpdatesAutomatically: Bool { didSet { defaults.set(installsUpdatesAutomatically, forKey: Key.installsUpdatesAutomatically) } }
+    /// Send one anonymous signal a day, so the developer can count how many Macs use the app. Not
+    /// shown in Settings (it carries no personal data); `defaults write` can turn it off.
+    public var sharesUsage: Bool { didSet { defaults.set(sharesUsage, forKey: Key.sharesUsage) } }
+    /// Show Codex's and Antigravity's usage limits, read on this Mac. Off until turned on.
+    public var aiUsageEnabled: Bool { didSet { defaults.set(aiUsageEnabled, forKey: Key.aiUsageEnabled) } }
+    /// The launcher tile's switch: while on, usage is checked and the lowest limit left shows
+    /// beside the camera when nothing else is on. Off stops the checks; the tile stays.
+    public var aiUsageInNotch: Bool { didSet { defaults.set(aiUsageInNotch, forKey: Key.aiUsageInNotch) } }
+    /// AI Agent Usage is on in Settings and its tile is switched on.
+    public var aiUsageLive: Bool { aiUsageEnabled && aiUsageInNotch }
+    public var aiUsageShowHomeWidget: Bool { didSet { defaults.set(aiUsageShowHomeWidget, forKey: Key.aiUsageShowHomeWidget) } }
+    public var aiUsageCodexEnabled: Bool { didSet { defaults.set(aiUsageCodexEnabled, forKey: Key.aiUsageCodexEnabled) } }
+    public var aiUsageAntigravityEnabled: Bool { didSet { defaults.set(aiUsageAntigravityEnabled, forKey: Key.aiUsageAntigravityEnabled) } }
+    var selectedAIProviders: Set<AIProvider> {
+        var selected: Set<AIProvider> = []
+        if aiUsageCodexEnabled { selected.insert(.codex) }
+        if aiUsageAntigravityEnabled { selected.insert(.antigravity) }
+        return selected
+    }
+    /// Focus session length and the break after it, in minutes.
+    public var focusMinutes: Int { didSet { defaults.set(focusMinutes, forKey: Key.focusMinutes) } }
+    public var breakMinutes: Int { didSet { defaults.set(breakMinutes, forKey: Key.breakMinutes) } }
+    public var calendarEnabled: Bool { didSet { defaults.set(calendarEnabled, forKey: Key.calendar) } }
+    public var shortcutsEnabled: Bool { didSet { defaults.set(shortcutsEnabled, forKey: Key.shortcuts) } }
+    /// Shortcut names pinned to the Home tab, in order.
+    public var favoriteShortcuts: [String] { didSet { defaults.set(favoriteShortcuts, forKey: Key.favoriteShortcuts) } }
+    /// Optional feature shortcuts beside the permanent Home shortcut, in display order.
+    public var featureShortcuts: [LauncherItem] {
+        didSet {
+            let normalized = FeatureShortcutSelection(items: featureShortcuts).items
+            if normalized != featureShortcuts {
+                featureShortcuts = normalized
+            } else {
+                defaults.set(featureShortcuts.map(\.rawValue), forKey: Key.featureShortcuts)
+            }
+        }
+    }
+    /// Show volume and brightness changes in the notch.
+    public var levelsEnabled: Bool { didSet { defaults.set(levelsEnabled, forKey: Key.levels) } }
+
+    public static let maximumFavoriteShortcuts = 4
+    public static let maximumFeatureShortcuts = FeatureShortcutSelection.maximumItems
+    public static let defaultFeatureShortcuts = FeatureShortcutSelection.defaultItems
+    public static let focusChoices = [15, 25, 45, 50, 60]
+    public static let breakChoices = [5, 10, 15]
+
+    /// Whether the user has explicitly customized their shortcuts. When false, the default shortcuts
+    /// matching earlier versions (Files and Clipboard) are preserved.
+    public var hasCustomizedFeatureShortcuts: Bool {
+        defaults.object(forKey: Key.featureShortcuts) != nil
+    }
+
+    /// Set after the first-launch hint has been shown.
+    public var hasShownWelcome: Bool { didSet { defaults.set(hasShownWelcome, forKey: Key.welcome) } }
+    /// How long a paused track stays in the pill.
+    public var pausedMediaLinger: TimeInterval { didSet { defaults.set(pausedMediaLinger, forKey: Key.linger) } }
+
+    public static let lingerChoices: [TimeInterval] = [10, 30, 60, 300]
+    public static let hoverDelayChoices: [Double] = [0.1, 0.15, 0.2, 0.25, 0.3, 0.4, 0.5]
+
+    public static func hoverDelayLabel(_ seconds: Double) -> String {
+        if abs(seconds - 0.4) < 0.001 {
+            return "0.4 seconds (default)"
+        }
+        return String(format: "%.2g seconds", seconds)
+    }
+
+    public init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+        let standard = Self.perchDefaults
+        // The old floating style and its position settings (before 1.3.3); forget what they saved.
+        for key in Key.retired { defaults.removeObject(forKey: key) }
+        appearance = NotchAppearance(
+            width: defaults.object(forKey: Key.width) as? Double ?? standard.width,
+            height: defaults.object(forKey: Key.height) as? Double ?? standard.height,
+            pitchBlack: defaults.object(forKey: Key.pitchBlack) as? Bool ?? standard.pitchBlack,
+            size: defaults.string(forKey: Key.size).flatMap(NotchSize.init(rawValue:)) ?? standard.size,
+            nookLayout: defaults.string(forKey: Key.nookLayout).flatMap(NookLayout.init(rawValue:)) ?? standard.nookLayout,
+            theme: defaults.string(forKey: Key.theme).flatMap(NotchTheme.init(rawValue:)) ?? standard.theme,
+            glassTint: defaults.object(forKey: Key.glassTint) as? Double ?? standard.glassTint,
+            externalStyle: defaults.string(forKey: Key.externalStyle).flatMap(ExternalDisplayStyle.init(rawValue:)) ?? standard.externalStyle,
+            companion: defaults.object(forKey: Key.companion) as? Bool ?? standard.companion
+        ).clamped()
+        showWhenIdle = defaults.object(forKey: Key.showWhenIdle) as? Bool ?? false
+        // Keep the behaviour of existing installations after replacing the old toggle with an
+        // explicit interaction mode. New installations use click-to-open.
+        if let stored = defaults.string(forKey: Key.notchOpenMode), let mode = NotchOpenMode(rawValue: stored) {
+            notchOpenMode = mode
+        } else {
+            notchOpenMode = (defaults.object(forKey: Key.expandOnHover) as? Bool) == true ? .hover : .click
+        }
+        let delay = defaults.object(forKey: Key.hoverDelay) as? Double ?? 0.4
+        hoverDelay = max(0.1, min(0.5, (delay * 100).rounded() / 100))
+        collapseOnPointerExit = defaults.object(forKey: Key.collapseOnPointerExit) as? Bool ?? true
+        hapticsEnabled = defaults.object(forKey: Key.haptics) as? Bool ?? true
+        liquidAnimations = defaults.object(forKey: Key.liquid) as? Bool ?? true
+        motionStyle = defaults.string(forKey: Key.motionStyle).flatMap(MotionStyle.init(rawValue:)) ?? .standard
+        showMenuBarIcon = defaults.object(forKey: Key.menuBarIcon) as? Bool ?? true
+        // On by default: the most asked-for fix in notch apps is staying out of videos and games.
+        hideInFullScreen = defaults.object(forKey: Key.hideInFullScreen) as? Bool ?? true
+        hideFromScreenCapture = defaults.bool(forKey: Key.hideFromScreenCapture)
+        display = (defaults.string(forKey: Key.display)).flatMap(DisplayChoice.init(rawValue:)) ?? .automatic
+        timerSound = defaults.object(forKey: Key.timerSound) as? Bool ?? true
+        nowPlayingEnabled = defaults.object(forKey: Key.nowPlaying) as? Bool ?? true
+        nowPlayingAppMode = defaults.string(forKey: Key.nowPlayingAppMode).flatMap(MediaAppFilter.Mode.init(rawValue:)) ?? .all
+        var seenApps = Set<String>()
+        nowPlayingApps = (defaults.stringArray(forKey: Key.nowPlayingApps) ?? []).filter { !$0.isEmpty && seenApps.insert($0).inserted }
+        recentMediaApps = RecentMediaApps(defaults.stringArray(forKey: Key.recentMediaApps) ?? [])
+        lyricsEnabled = defaults.object(forKey: Key.lyrics) as? Bool ?? true
+        liveMusicBars = defaults.object(forKey: Key.liveMusicBars) as? Bool ?? true
+        if let saved = defaults.stringArray(forKey: Key.agentApprovalKinds) {
+            agentApprovals = Set(saved.compactMap(AgentKind.init(rawValue:)))
+        } else {
+            // Builds before other assistants had one switch, for Claude Code.
+            agentApprovals = defaults.bool(forKey: Key.agentApprovals) ? [.claude] : []
+        }
+        timerEnabled = defaults.object(forKey: Key.timer) as? Bool ?? true
+        callsEnabled = defaults.object(forKey: Key.calls) as? Bool ?? true
+        airDropEnabled = defaults.object(forKey: Key.airDrop) as? Bool ?? true
+        chargingAlertsEnabled = defaults.object(forKey: Key.charging) as? Bool ?? true
+        lowBatteryAlertsEnabled = defaults.object(forKey: Key.lowBattery) as? Bool ?? true
+        // Off by default: macOS shows its own banner; ours adds the battery level.
+        headphoneAlertsEnabled = defaults.object(forKey: Key.headphones) as? Bool ?? false
+        hasShownWelcome = defaults.bool(forKey: Key.welcome)
+        trayEnabled = defaults.object(forKey: Key.tray) as? Bool ?? true
+        mirrorEnabled = defaults.object(forKey: Key.mirror) as? Bool ?? true
+        clipboardEnabled = defaults.object(forKey: Key.clipboard) as? Bool ?? true
+        clipboardReadsImages = defaults.object(forKey: Key.clipboardImages) as? Bool ?? false
+        notesEnabled = defaults.object(forKey: Key.notes) as? Bool ?? true
+        downloadsEnabled = defaults.object(forKey: Key.downloads) as? Bool ?? false
+        remindersEnabled = defaults.object(forKey: Key.reminders) as? Bool ?? true
+        weatherEnabled = defaults.bool(forKey: Key.weather)
+        homeWidgets = (defaults.array(forKey: Key.homeWidgets) as? [String]).map(HomeLayout.normalized) ?? HomeWidget.defaultOrder
+        clipboardLimit = (defaults.object(forKey: Key.clipboardLimit) as? Int).flatMap { ClipboardHistory.limits.contains($0) ? $0 : nil } ?? ClipboardHistory.capacity
+        weatherCity = defaults.string(forKey: Key.weatherCity) ?? ""
+        weatherUsesLocation = defaults.bool(forKey: Key.weatherUsesLocation)
+        statsEnabled = defaults.object(forKey: Key.stats) as? Bool ?? false
+        lockScreenEnabled = defaults.object(forKey: Key.lockScreen) as? Bool ?? false
+        keyboardShortcutsEnabled = defaults.object(forKey: Key.keyboardShortcuts) as? Bool ?? true
+        // Off in this fork: the feed is the original app's, and an update would replace these changes.
+        checksForUpdates = defaults.object(forKey: Key.checksForUpdates) as? Bool ?? false
+        installsUpdatesAutomatically = defaults.object(forKey: Key.installsUpdatesAutomatically) as? Bool ?? false
+        sharesUsage = defaults.object(forKey: Key.sharesUsage) as? Bool ?? true
+        agentFinishedAlerts = defaults.object(forKey: Key.agentFinishedAlerts) as? Bool ?? true
+        agentWatchesTranscript = defaults.object(forKey: Key.agentWatchesTranscript) as? Bool ?? true
+        aiUsageEnabled = defaults.object(forKey: Key.aiUsageEnabled) as? Bool ?? false
+        // Early test builds stored API keys here in plain text; they are no longer used.
+        for key in ["aiUsageClaudeApiKey", "aiUsageCodexApiKey", "aiUsageCodexOrgId", "aiUsageAntigravityApiKey", "aiUsage.claudeEnabled"] {
+            defaults.removeObject(forKey: key)
+        }
+        aiUsageShowHomeWidget = defaults.object(forKey: Key.aiUsageShowHomeWidget) as? Bool ?? true
+        aiUsageInNotch = defaults.object(forKey: Key.aiUsageInNotch) as? Bool ?? true
+        aiUsageCodexEnabled = defaults.object(forKey: Key.aiUsageCodexEnabled) as? Bool ?? true
+        aiUsageAntigravityEnabled = defaults.object(forKey: Key.aiUsageAntigravityEnabled) as? Bool ?? true
+        let focus = defaults.object(forKey: Key.focusMinutes) as? Int ?? 25
+        focusMinutes = Self.focusChoices.contains(focus) ? focus : 25
+        let rest = defaults.object(forKey: Key.breakMinutes) as? Int ?? 5
+        breakMinutes = Self.breakChoices.contains(rest) ? rest : 5
+        calendarEnabled = defaults.object(forKey: Key.calendar) as? Bool ?? true
+        shortcutsEnabled = defaults.object(forKey: Key.shortcuts) as? Bool ?? true
+        favoriteShortcuts = Array((defaults.stringArray(forKey: Key.favoriteShortcuts) ?? []).prefix(Self.maximumFavoriteShortcuts))
+        if let saved = defaults.object(forKey: Key.featureShortcuts) as? [String] {
+            featureShortcuts = FeatureShortcutSelection(rawValues: saved).items
+        } else {
+            featureShortcuts = Self.defaultFeatureShortcuts
+        }
+        levelsEnabled = defaults.object(forKey: Key.levels) as? Bool ?? true
+        let linger = defaults.object(forKey: Key.linger) as? Double ?? 30
+        pausedMediaLinger = Self.lingerChoices.contains(linger) ? linger : 30
+    }
+
+    /// Pins or unpins a shortcut on the Home tab. Returns false when the list is full.
+    @discardableResult
+    public func toggleFavorite(_ name: String) -> Bool {
+        if let index = favoriteShortcuts.firstIndex(of: name) {
+            favoriteShortcuts.remove(at: index)
+            return true
+        }
+        guard favoriteShortcuts.count < Self.maximumFavoriteShortcuts else { return false }
+        favoriteShortcuts.append(name)
+        return true
+    }
+
+    /// Adds a shortcut beside Home, after the others. Home itself is always there.
+    @discardableResult
+    public func addFeatureShortcut(_ item: LauncherItem) -> Bool {
+        var selection = FeatureShortcutSelection(items: featureShortcuts)
+        guard selection.add(item) else { return false }
+        featureShortcuts = selection.items
+        return true
+    }
+
+    @discardableResult
+    public func removeFeatureShortcut(_ item: LauncherItem) -> Bool {
+        var selection = FeatureShortcutSelection(items: featureShortcuts)
+        guard selection.remove(item) else { return false }
+        featureShortcuts = selection.items
+        return true
+    }
+
+
+    /// Remembers an app that played something. Saves only when it's new.
+    public func noteMediaApp(_ identifier: String) {
+        var recent = recentMediaApps
+        if recent.note(identifier) { recentMediaApps = recent }
+    }
+
+    public func setNowPlaying(_ identifier: String, allowed: Bool) {
+        if allowed {
+            guard !identifier.isEmpty, !nowPlayingApps.contains(identifier) else { return }
+            nowPlayingApps.append(identifier)
+        } else {
+            nowPlayingApps.removeAll { $0 == identifier }
+        }
+    }
+
+    /// Takes an app off the list in Settings (it comes back if it plays again).
+    public func forgetMediaApp(_ identifier: String) {
+        setNowPlaying(identifier, allowed: false)
+        var recent = recentMediaApps
+        recent.remove(identifier)
+        if recent != recentMediaApps { recentMediaApps = recent }
+    }
+
+    public func resetAppearance() {
+        appearance = Self.perchDefaults
+    }
+
+    /// Perch's own look: the black Dynamic Island Mac users know, with Pip on. Brutal and Glass
+    /// are one click away in Settings › Appearance. `NotchAppearance.standard` stays the
+    /// original look so the layout engine's defaults (and their tests) don't change.
+    public static var perchDefaults: NotchAppearance {
+        var look = NotchAppearance.standard
+        look.companion = true
+        return look
+    }
+
+    private enum Key {
+        /// Settings from the floating pill style, removed in 1.3.3.
+        static let retired = ["shape.style", "shape.verticalOffset", "shape.horizontalOffset"]
+        static let pitchBlack = "shape.pitchBlack"
+        static let size = "shape.size"
+        static let nookLayout = "shape.nookLayout"
+        static let theme = "shape.theme"
+        static let companion = "shape.companion"
+        static let glassTint = "shape.glassTint"
+        static let externalStyle = "shape.externalStyle"
+        static let width = "shape.width"
+        static let height = "shape.height"
+        static let showWhenIdle = "behavior.showWhenIdle"
+        static let notchOpenMode = "behavior.notchOpenMode"
+        static let hoverDelay = "behavior.hoverDelay"
+        /// Legacy boolean retained only to migrate versions that shipped before interaction modes.
+        static let expandOnHover = "behavior.expandOnHover"
+        static let collapseOnPointerExit = "behavior.collapseOnPointerExit"
+        static let haptics = "behavior.haptics"
+        static let liquid = "behavior.liquidAnimations"
+        static let motionStyle = "behavior.motionStyle"
+        static let menuBarIcon = "general.showMenuBarIcon"
+        static let hideInFullScreen = "behavior.hideInFullScreen"
+        static let hideFromScreenCapture = "behavior.hideFromScreenCapture"
+        static let display = "general.display"
+        static let timerSound = "timer.sound"
+        static let nowPlaying = "activity.nowPlaying"
+        static let lyrics = "activity.lyrics"
+        static let liveMusicBars = "activity.liveMusicBars"
+        /// The single Claude Code switch from earlier builds, read once to carry it over.
+        static let agentApprovals = "activity.agentApprovals"
+        static let agentApprovalKinds = "activity.agentApprovalKinds"
+        static let nowPlayingAppMode = "nowPlaying.appMode"
+        static let nowPlayingApps = "nowPlaying.apps"
+        static let recentMediaApps = "nowPlaying.recentApps"
+        static let timer = "activity.timer"
+        static let calls = "activity.calls"
+        static let airDrop = "activity.airDrop"
+        static let charging = "alert.charging"
+        static let lowBattery = "alert.lowBattery"
+        static let headphones = "alert.headphones"
+        static let linger = "nowPlaying.pausedLinger"
+        static let welcome = "app.hasShownWelcome"
+        static let tray = "home.tray"
+        static let mirror = "home.mirror"
+        static let clipboard = "home.clipboard"
+        static let clipboardImages = "home.clipboardImages"
+        static let notes = "home.notes"
+        static let downloads = "alert.downloads"
+        static let reminders = "home.reminders"
+        static let weather = "home.weather"
+        static let homeWidgets = "home.widgets"
+        static let clipboardLimit = "clipboard.limit"
+        static let weatherCity = "home.weatherCity"
+        static let weatherUsesLocation = "home.weatherUsesLocation"
+        static let stats = "home.stats"
+        static let lockScreen = "general.lockScreen"
+        static let keyboardShortcuts = "general.keyboardShortcuts"
+        static let checksForUpdates = "general.checksForUpdates"
+        static let installsUpdatesAutomatically = "general.installsUpdatesAutomatically"
+        static let sharesUsage = "general.sharesUsage"
+        static let agentFinishedAlerts = "agents.finishedAlerts"
+        static let agentWatchesTranscript = "agents.watchesTranscript"
+        static let aiUsageEnabled = "aiUsage.enabled"
+        static let aiUsageShowHomeWidget = "aiUsage.showHomeWidget"
+        static let aiUsageInNotch = "aiUsage.inNotch"
+        static let aiUsageCodexEnabled = "aiUsage.codexEnabled"
+        static let aiUsageAntigravityEnabled = "aiUsage.antigravityEnabled"
+        static let focusMinutes = "timer.focusMinutes"
+        static let breakMinutes = "timer.breakMinutes"
+        static let calendar = "home.calendar"
+        static let shortcuts = "home.shortcuts"
+        static let favoriteShortcuts = "home.favoriteShortcuts"
+        static let featureShortcuts = "home.featureShortcuts"
+        static let levels = "alert.levels"
+    }
+}

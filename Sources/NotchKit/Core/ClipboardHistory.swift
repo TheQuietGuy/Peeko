@@ -1,0 +1,138 @@
+import Foundation
+
+/// Recently copied text, newest first, with pinned clips kept at the top. Unpinned copies live
+/// in memory only; pinned ones are the user's to keep, so the monitor saves those.
+public struct ClipboardHistory: Equatable, Sendable {
+    public struct Entry: Identifiable, Equatable, Sendable, Codable {
+        public let id: UUID
+        public let text: String
+        /// Name of the app it was copied from, when known.
+        public let appName: String?
+        public let copiedAt: Date
+        public var isPinned = false
+    }
+
+    /// Pinned first (newest pin first), then the rest, newest first.
+    public private(set) var entries: [Entry] = []
+
+    /// Unpinned copies kept by default. Pinned ones don't count towards it.
+    public static let capacity = 20
+    /// The sizes offered in Settings.
+    public static let limits = [20, 50, 100]
+    /// Unpinned copies kept; Settings › Home & Widgets › Clipboard.
+    public private(set) var limit = Self.capacity
+    public static let pinnedCapacity = 20
+    /// Longer copies are kept whole on the pasteboard but cut here, so the history stays small.
+    public static let maximumLength = 20_000
+
+    public init(pinned: [Entry] = []) {
+        entries = Array(pinned.filter(\.isPinned).prefix(Self.pinnedCapacity))
+    }
+
+    public var pinned: [Entry] { entries.filter(\.isPinned) }
+    public var pinnedCount: Int { entries.lazy.filter(\.isPinned).count }
+    public var canPin: Bool { pinnedCount < Self.pinnedCapacity }
+
+    /// Adds a copy. Copying the same text again moves it to the front instead of repeating it,
+    /// and a pinned clip stays pinned. Returns false for text that isn't worth keeping (empty or
+    /// only whitespace).
+    @discardableResult
+    public mutating func add(_ text: String, appName: String? = nil, now: Date = Date()) -> Bool {
+        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }
+        let kept = text.count > Self.maximumLength ? String(text.prefix(Self.maximumLength)) : text
+        if let index = entries.firstIndex(where: { $0.text == kept }), entries[index].isPinned {
+            // Pinned clips keep their place; the pin order is the user's.
+            return true
+        }
+        entries.removeAll { $0.text == kept }
+        entries.insert(Entry(id: UUID(), text: kept, appName: appName, copiedAt: now), at: pinnedCount)
+        trim()
+        return true
+    }
+
+    /// Changes how many unpinned copies are kept, dropping the oldest if it shrank.
+    public mutating func setLimit(_ newLimit: Int) {
+        limit = max(1, newLimit)
+        trim()
+    }
+
+    private mutating func trim() {
+        let unpinned = entries.count - pinnedCount
+        if unpinned > limit { entries.removeLast(unpinned - limit) }
+    }
+
+    /// Pins or unpins. A new pin goes to the top; an unpinned clip joins the history at the
+    /// front. Returns false when the pins are full.
+    @discardableResult
+    public mutating func togglePin(_ id: UUID) -> Bool {
+        guard let index = entries.firstIndex(where: { $0.id == id }) else { return false }
+        var entry = entries.remove(at: index)
+        if entry.isPinned {
+            entry.isPinned = false
+            entries.insert(entry, at: pinnedCount)
+            trim()
+            return true
+        }
+        guard canPin else {
+            entries.insert(entry, at: index)
+            return false
+        }
+        entry.isPinned = true
+        entries.insert(entry, at: 0)
+        return true
+    }
+
+    public mutating func remove(_ id: UUID) {
+        entries.removeAll { $0.id == id }
+    }
+
+    /// Clears the history. Pinned clips stay unless `includingPinned`.
+    public mutating func removeAll(includingPinned: Bool = false) {
+        entries.removeAll { includingPinned || !$0.isPinned }
+    }
+
+    /// Entries whose text or app contains every word of the query, ignoring case and accents.
+    public func matching(_ query: String) -> [Entry] {
+        let words = query.split(whereSeparator: \.isWhitespace).map(String.init)
+        guard !words.isEmpty else { return entries }
+        return entries.filter { entry in
+            words.allSatisfy { word in
+                entry.text.range(of: word, options: [.caseInsensitive, .diacriticInsensitive]) != nil
+                    || entry.appName?.range(of: word, options: [.caseInsensitive, .diacriticInsensitive]) != nil
+            }
+        }
+    }
+
+    /// One line for the card: whitespace runs collapsed, so code and lists stay readable.
+    public static func preview(_ text: String, limit: Int = 200) -> String {
+        let collapsed = text
+            .split(whereSeparator: { $0.isWhitespace })
+            .joined(separator: " ")
+        return collapsed.count > limit ? String(collapsed.prefix(limit)) + "…" : collapsed
+    }
+}
+
+/// Which copies must never be recorded.
+public enum ClipboardRules {
+    /// Markers apps put on the pasteboard to say "don't keep this" (see nspasteboard.org).
+    /// Password managers mark passwords as concealed.
+    public static let privateTypes: Set<String> = [
+        "org.nspasteboard.ConcealedType",
+        "org.nspasteboard.TransientType",
+        "org.nspasteboard.AutoGeneratedType",
+        "com.agilebits.onepassword",
+        "com.typeit4me.clipping",
+        "de.petermaurer.TransientPasteboardType",
+        "Pasteboard generator type",
+    ]
+
+    public static func shouldRecord(types: [String]) -> Bool {
+        !types.contains(where: privateTypes.contains)
+    }
+
+    /// A copied picture, such as a screenshot. Files copied in Finder carry their icon as an
+    /// image too, so anything with a file URL isn't one.
+    public static func isImage(types: [String]) -> Bool {
+        types.contains { $0 == "public.png" || $0 == "public.tiff" } && !types.contains("public.file-url")
+    }
+}
