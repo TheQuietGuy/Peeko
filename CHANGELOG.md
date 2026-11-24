@@ -5,7 +5,7 @@ Every release of Dynamic Ledge (called Dynamic Notch until 1.4.0), newest first.
 [Semantic Versioning](https://semver.org/): new features bump the middle number, fixes bump the
 last one.
 
-## [Unreleased]
+## [2.5.0] - 2026-11-23
 
 ### Added
 - **Colour Picker** (⌃⌥X). Pick a colour from anything on screen with the system magnifier;
