@@ -170,7 +170,7 @@ struct TimerPanelBody: View {
                 }
                 VStack(alignment: .trailing, spacing: 0) {
                     Text(bigText(mode))
-                        .font(.system(size: 40 * s, weight: .thin))
+                        .numeral(size: 40 * s, weight: .thin)
                         .monospacedDigit()
                         .foregroundStyle(tint)
                         .contentTransition(.numericText())
@@ -275,7 +275,7 @@ private struct RunningClock<Time: View>: View {
                 Text(label)
                     .font(.system(size: 14 * s, weight: .medium))
                 time
-                    .font(.system(size: 46 * s, weight: .thin))
+                    .numeral(size: 46 * s, weight: .thin)
                     .monospacedDigit()
                     .lineLimit(1)
                     .fixedSize()

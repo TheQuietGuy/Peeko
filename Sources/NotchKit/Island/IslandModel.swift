@@ -50,7 +50,6 @@ public final class IslandModel {
     public var isEditingShortcuts = false
     public let hotKeys = HotKeys()
     public let updater = Updater()
-    let usage = UsageReporter()
     let camera = CameraAccess()
 
     /// What the Timer panel starts, and the minutes picked on its ruler.
@@ -189,19 +188,16 @@ public final class IslandModel {
         calendar.onGranted = { [weak self] in self?.showTab(.calendar) }
         reminders.onGranted = { [weak self] in self?.showTab(.reminders) }
         updater.onAvailable = { [weak self] release in self?.receive(.updateAvailable(version: release.version.description)) }
-        updater.onInstallStarting = { [weak self] automatically in
-            guard let self, self.settings.sharesUsage else { return }
-            self.usage.noteUpdateStarting(automatically: automatically)
-        }
-        updater.onInstallFailed = { [weak self] step, error in
-            guard let self, self.settings.sharesUsage else { return }
-            self.usage.noteUpdateFailed(step: step, error: error)
-        }
         updater.isBusy = { [weak self] in
             guard let self else { return false }
             return !self.agents.pending.isEmpty || self.timer.isActive || self.stopwatch.isActive || self.calls.session != nil
         }
-        power.onAlert = { [weak self] alert in self?.receive(alert) }
+        power.onAlert = { [weak self] alert in
+            guard let self else { return }
+            // Keep Awake lets the Mac sleep again once its own battery runs low (20 %, and 10 %).
+            if case .lowBattery = alert, self.keepAwake.isOn { self.keepAwake.turnOff() }
+            self.receive(alert)
+        }
         audioRoute.onAlert = { [weak self] alert in self?.receive(alert) }
         nowPlaying.lingerDuration = settings.pausedMediaLinger
         nowPlaying.appFilter = settings.mediaAppFilter
@@ -255,7 +251,6 @@ public final class IslandModel {
         if settings.keyboardShortcutsEnabled { hotKeys.register() }
         updater.installsAutomatically = settings.checksForUpdates && settings.installsUpdatesAutomatically
         if settings.checksForUpdates { updater.startAutomaticChecks() }
-        if settings.sharesUsage { usage.start(isNewInstall: !settings.hasShownWelcome) }
         if !settings.hasShownWelcome {
             settings.hasShownWelcome = true
             Task { [weak self] in
@@ -285,7 +280,6 @@ public final class IslandModel {
         spectrum.reset()
         hotKeys.unregister()
         updater.stopAutomaticChecks()
-        usage.stop()
         keepAwake.turnOff()
         notes.save()
         alarm.stop()
@@ -1279,7 +1273,6 @@ public final class IslandModel {
             _ = settings.keyboardShortcutsEnabled
             _ = settings.checksForUpdates
             _ = settings.installsUpdatesAutomatically
-            _ = settings.sharesUsage
             _ = settings.aiUsageEnabled
             _ = settings.aiUsageInNotch
         } onChange: { [weak self] in
@@ -1303,7 +1296,6 @@ public final class IslandModel {
                 if self.settings.keyboardShortcutsEnabled { self.hotKeys.register() } else { self.hotKeys.unregister() }
                 self.updater.installsAutomatically = self.settings.checksForUpdates && self.settings.installsUpdatesAutomatically
                 if self.settings.checksForUpdates { self.updater.startAutomaticChecks() } else { self.updater.stopAutomaticChecks() }
-                if self.settings.sharesUsage { self.usage.start(isNewInstall: false) } else { self.usage.stop() }
                 self.agents.enabledKinds = self.settings.agentApprovals
                 self.agents.watchesTranscripts = self.settings.agentWatchesTranscript
                 if self.settings.agentApprovalsEnabled {

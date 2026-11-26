@@ -18,7 +18,9 @@ struct IslandRootView: View {
         let liquid = model.settings.liquidAnimations && !reduceMotion && !brutal
         // The song colours the notch while it plays: a glow under Black and Glass, Brutal's hard shadow.
         let playing = presentation.showsMusic && model.nowPlaying.info?.isPlaying == true && model.nowPlaying.accent != .white
-        let songColor = playing ? NotchColor.accent(model.nowPlaying.accent) : nil
+        // Glyph is monochrome: no song colour.
+        let glyph = appearance.theme == .glyph
+        let songColor = playing && !glyph ? NotchColor.accent(model.nowPlaying.accent) : nil
 
         ZStack(alignment: .topLeading) {
             // Only the bubble splitting off (or merging back) melts; the notch itself keeps crisp
@@ -33,7 +35,7 @@ struct IslandRootView: View {
                     .frame(width: layout.canvasSize.width, height: layout.canvasSize.height, alignment: .topLeading)
             } else {
                 KeyframeAnimator(initialValue: 0.0, trigger: presentation.topology.split) { pulse in
-                    IslandSurface(layout: layout, pulse: pulse, liquid: liquid, brutal: brutal, songColor: songColor)
+                    IslandSurface(layout: layout, pulse: pulse, liquid: liquid, brutal: brutal, glyph: glyph, songColor: songColor)
                 } keyframes: { _ in
                     KeyframeTrack {
                         CubicKeyframe(1, duration: 0.08)
@@ -59,6 +61,7 @@ struct IslandRootView: View {
         .animation(reduceMotion ? nil : Motion.hover(model.settings.motionStyle), value: model.isHoveringPill)
         .environment(\.colorScheme, .dark)
         .environment(\.brutal, brutal)
+        .environment(\.glyph, glyph)
         // No scroll bars anywhere in the notch, even when macOS shows them because a mouse is
         // connected: they'd cover content and squeeze narrow lists like the timer's wheels.
         .scrollIndicators(.never)
@@ -66,7 +69,7 @@ struct IslandRootView: View {
         // tucked away. This keeps Voice Control and automation able to open the same Home view
         // that a click on the notch opens without changing the panel's mouse routing.
         .accessibilityElement(children: .contain)
-        .accessibilityLabel(Text("Perch"))
+        .accessibilityLabel(Text("Peeko"))
         .accessibilityAction(named: Text("Open Home")) { model.showTab(.home) }
     }
 }
@@ -80,6 +83,8 @@ struct IslandContentLayer: View {
     /// the shape still, so the content just crossfades instead of growing out of the notch again.
     @State private var nookWasOpen = false
     @Environment(\.brutal) private var brutal
+    @Environment(\.glyph) private var glyph
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// What an open view resizes to fit in place: lyrics arriving, a search bar, a settings change.
     /// While it does, the content keeps its size instead of growing with the shape, so it doesn't
     /// zoom. Opening and closing always grow and shrink it with the shape.
@@ -183,12 +188,13 @@ struct IslandContentLayer: View {
         .contextMenu { IslandContextMenu(model: model, presentation: presentation) }
         .position(x: layout.pill.midX, y: layout.pill.midY)
         .accessibilityElement(children: .contain)
-        .accessibilityLabel(Text("Perch"))
+        .accessibilityLabel(Text("Peeko"))
     }
 
     private var contentTransition: AnyTransition {
         if nookWasOpen && presentation.homeTab != nil { return .nookTab }
-        return Motion.isOpenView(presentation) ? .islandOpenContent : .islandCompactContent
+        guard Motion.isOpenView(presentation) else { return .islandCompactContent }
+        return glyph && !reduceMotion ? .glyphOpenContent : .islandOpenContent
     }
 
     private var hasBubble: Bool {
@@ -375,7 +381,7 @@ struct IslandContextMenu: View {
         Button("All Features") { model.showTab(.launcher) }
         Button(model.keepAwake.isOn ? "Stop Keeping Awake" : "Keep Mac Awake") { model.keepAwake.toggle() }
         Button("Settings…") { model.onOpenSettings?() }
-        Button("Quit Perch") { NSApp.terminate(nil) }
+        Button("Quit Peeko") { NSApp.terminate(nil) }
     }
 }
 

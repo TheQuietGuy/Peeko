@@ -21,9 +21,10 @@ struct PillStyleTests {
         #expect(layout.topRadius == layout.pill.height / 2 && layout.bottomRadius == layout.pill.height / 2, "same round ends, so the bubble is a circle")
     }
 
-    @Test func notchIsTheDefault() {
-        #expect(NotchAppearance.standard.externalStyle == .notch)
-        #expect(!LayoutEngine(screen: external, appearance: .standard).isPill)
+    @MainActor @Test func pillIsPeekosDefault() {
+        #expect(SettingsStore.perchDefaults.externalStyle == .pill)
+        #expect(LayoutEngine(screen: external, appearance: SettingsStore.perchDefaults).isPill)
+        #expect(!LayoutEngine(screen: external, appearance: .standard).isPill, "the engine itself still defaults to a notch")
     }
 
     @Test func aMacBookNotchStaysANotch() {

@@ -15,7 +15,10 @@ struct WaveformBars: NSViewRepresentable {
     }
 
     func updateNSView(_ view: WaveformBarsView, context: Context) {
-        view.update(color: NSColor(color), isPlaying: isPlaying)
+        // Glyph is monochrome, and each bar is a column of lit dots.
+        let glyph = context.environment.glyph
+        view.dotted = glyph
+        view.update(color: glyph ? .white : NSColor(color), isPlaying: isPlaying)
         view.spectrum = spectrum
     }
 }
@@ -31,6 +34,10 @@ final class WaveformBarsView: NSView {
         }
     }
     private var isFollowing = false
+    /// Glyph: each bar becomes a column of LED dots.
+    var dotted = false {
+        didSet { if dotted != oldValue { needsLayout = true } }
+    }
 
     /// Heights per bar as a fraction of the view, looped at slightly different speeds so the
     /// bars never fall into step.
@@ -118,6 +125,28 @@ final class WaveformBarsView: NSView {
         CATransaction.commit()
     }
 
+    /// A dot under every bar position, stacked a dot and a half apart, so a bar shows as lit
+    /// dots. Two replicators copy one dot: drawn by the GPU, nothing to redraw as bars move.
+    private func dotMask(width: CGFloat, spacing: CGFloat, size: CGSize) -> CALayer {
+        let pitch = width * 1.4
+        let rows = max(1, Int(size.height / pitch))
+        let dot = CALayer()
+        dot.backgroundColor = NSColor.white.cgColor
+        dot.cornerRadius = width / 2
+        dot.frame = CGRect(x: 0, y: (size.height - CGFloat(rows - 1) * pitch - width) / 2, width: width, height: width)
+        let column = CAReplicatorLayer()
+        column.instanceCount = rows
+        column.instanceTransform = CATransform3DMakeTranslation(0, pitch, 0)
+        column.frame = CGRect(origin: .zero, size: size)
+        column.addSublayer(dot)
+        let grid = CAReplicatorLayer()
+        grid.instanceCount = bars.count
+        grid.instanceTransform = CATransform3DMakeTranslation(width + spacing, 0, 0)
+        grid.frame = CGRect(origin: .zero, size: size)
+        grid.addSublayer(column)
+        return grid
+    }
+
     private func applyMotion(animatedTransition: Bool) {
         let size = bounds.size
         guard size.width > 0, size.height > 0, !bars.isEmpty else { return }
@@ -128,6 +157,7 @@ final class WaveformBarsView: NSView {
 
         CATransaction.begin()
         CATransaction.setDisableActions(!animatedTransition)
+        layer?.mask = dotted ? dotMask(width: width, spacing: spacing, size: size) : nil
         for (index, bar) in bars.enumerated() {
             bar.removeAnimation(forKey: "level")
             bar.cornerRadius = width / 2
@@ -302,16 +332,17 @@ struct ChipButtonStyle: ButtonStyle {
         let pressed = configuration.isPressed
         let shape = RoundedRectangle(cornerRadius: 6 * scale, style: .continuous)
         return configuration.label
-            .font(.system(size: 12 * scale, weight: .heavy))
+            .font(.system(size: 12 * scale, weight: .bold))
             .monospacedDigit()
             .lineLimit(1)
             .minimumScaleFactor(0.8)
-            .foregroundStyle(.black)
+            .foregroundStyle(tint)
             .padding(.horizontal, 4 * scale)
             .frame(height: 30 * scale - depth)
             .frame(maxWidth: .infinity)
-            .background(shape.fill(tint))
-            // On the black notch a black shadow would vanish; coral is the Brutal shadow.
+            .background(shape.fill(BrutalPalette.key))
+            .overlay(shape.strokeBorder(BrutalPalette.edge, lineWidth: BrutalPalette.edgeWidth))
+            // A black shadow would vanish on the black notch: the pale plate is the Brutal shadow.
             .background(shape.fill(BrutalPalette.shadow).offset(x: pressed ? 0 : depth, y: pressed ? 0 : depth))
             .offset(x: pressed ? depth : 0, y: pressed ? depth : 0)
             .padding(.trailing, depth)

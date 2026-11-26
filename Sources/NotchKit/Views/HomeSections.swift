@@ -666,7 +666,7 @@ private struct CalendarSection: View {
                 message("Calendar access is off.")
                 Button("Allow Access") { calendar.openPrivacySettings() }
                     .buttonStyle(QuickActionStyle(tint: NotchColor.red, scale: s))
-                    .help("Turn on Perch in Privacy & Security › Calendars")
+                    .help("Turn on Peeko in Privacy & Security › Calendars")
             }
         case .granted:
             Button { model.showTab(.calendar) } label: {

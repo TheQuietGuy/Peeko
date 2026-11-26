@@ -1,6 +1,6 @@
 import AppKit
 
-/// Perch's menu bar icon: a tiny notch with Pip's two eyes cut out of it. A template image,
+/// Peeko's menu bar icon: a tiny notch with Pip's two eyes cut out of it. A template image,
 /// so macOS tints it for a light or dark menu bar like its own icons.
 enum PipGlyph {
     static func menuBarImage(asleep: Bool = false) -> NSImage {
@@ -23,7 +23,7 @@ enum PipGlyph {
             return true
         }
         image.isTemplate = true
-        image.accessibilityDescription = "Perch"
+        image.accessibilityDescription = "Peeko"
         return image
     }
 }

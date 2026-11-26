@@ -57,11 +57,43 @@ struct MediaSourceTests {
         service.apply(playing("Song", "com.apple.finder", now: now), artworkData: nil, now: now)
         #expect(service.otherSources.isEmpty)
         service.apply(playing("Video", "com.apple.dock", now: now), artworkData: nil, now: now)
+        #expect(service.info?.title == "Song", "a new source waits a moment before taking over")
+        service.settlePending(now: now.addingTimeInterval(2))
+        #expect(service.info?.title == "Video", "the first went quiet, so the new one takes over")
         #expect(service.otherSources.map(\.id) == ["com.apple.finder"])
         #expect(service.otherSources.first?.info.title == "Song")
         // Back to the first app: it's current again, and the second is now the other one.
-        service.apply(playing("Song", "com.apple.finder", now: now), artworkData: nil, now: now)
+        let later = now.addingTimeInterval(3)
+        service.apply(playing("Song", "com.apple.finder", now: later), artworkData: nil, now: later)
+        service.settlePending(now: later.addingTimeInterval(2))
         #expect(service.otherSources.map(\.id) == ["com.apple.dock"])
+    }
+
+    @Test func twoTabsTalkingOverEachOtherDontFlipTheView() {
+        let service = NowPlayingService()
+        let now = Date()
+        service.apply(playing("Lecture", "com.apple.finder", now: now), artworkData: nil, now: now)
+        // Another tab of the same app, mid-video: macOS reports it, then the first again.
+        var tab = playing("Music video", "com.apple.finder", now: now)
+        tab.elapsed = 60
+        service.apply(tab, artworkData: nil, now: now.addingTimeInterval(0.2))
+        service.apply(playing("Lecture", "com.apple.finder", now: now), artworkData: nil, now: now.addingTimeInterval(0.6))
+        service.settlePending(now: now.addingTimeInterval(2))
+        #expect(service.info?.title == "Lecture", "the view stays put")
+        #expect(service.otherSources.map(\.id) == ["com.apple.finder#Music video"], "the other tab is in the switcher")
+        #expect(service.otherSources.first?.name == "Music video", "named by what it plays")
+        #expect(service.otherSources.first?.bundleID == "com.apple.finder")
+    }
+
+    @Test func theNextSongInTheSameTabIsntASecondSource() {
+        let service = NowPlayingService()
+        let now = Date()
+        service.apply(playing("Song one", "com.apple.finder", now: now), artworkData: nil, now: now)
+        var next = playing("Song two", "com.apple.finder", now: now)
+        next.elapsed = 1
+        service.apply(next, artworkData: nil, now: now.addingTimeInterval(1))
+        #expect(service.info?.title == "Song two", "straight away")
+        #expect(service.otherSources.isEmpty)
     }
 
     @Test func forgetsAPausedAppAndFinishedTracks() {
@@ -72,6 +104,7 @@ struct MediaSourceTests {
         #expect(service.otherSources.isEmpty, "a paused app isn't still playing")
 
         service.apply(playing("Song", "com.apple.finder", now: now), artworkData: nil, now: now)
+        service.settlePending(now: now.addingTimeInterval(2))
         #expect(service.otherSources.map(\.id) == ["com.apple.dock"])
         service.selectedSourceID = "com.apple.dock"
         service.pruneOtherSources(now: now.addingTimeInterval(400))
@@ -154,7 +187,9 @@ struct AllDisplaysTests {
         model.expand(.home)
         #expect(model.presentation(onDisplay: 1) == .home)
         #expect(model.presentation(onDisplay: 2) == .compact(primary: .timer, secondary: nil))
-        #expect(model.layout(onDisplay: 2, metrics: external).flare > 0, "no notch: still a notch")
+        #expect(model.layout(onDisplay: 2, metrics: external).pill.minY > 0, "no notch: a floating pill, by default")
+        model.settings.appearance.externalStyle = .notch
+        #expect(model.layout(onDisplay: 2, metrics: external).flare > 0, "or a drawn notch, if chosen")
         model.cancelTimer()
     }
 

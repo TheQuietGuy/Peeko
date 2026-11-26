@@ -134,12 +134,15 @@ struct LyricsLine: View {
             let index = info?.elapsed(at: context.date).flatMap { lyrics.index(at: $0 + Self.lead + 0.01) }
             let text = index.map { lyrics.lines[$0].text } ?? ""
             ZStack {
-                Text(text.isEmpty ? "♪" : text)
-                    .font(.system(size: size, weight: .semibold))
-                    .foregroundStyle(text.isEmpty ? NotchColor.secondaryText : .white)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.75)
-                    .multilineTextAlignment(alignment == .center ? .center : .leading)
+                // Before the first line and in instrumental breaks: what's playing, not a bare note.
+                let between = [info?.title, info?.artist].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · ")
+                LyricText(
+                    text: text.isEmpty ? (between.isEmpty ? "♪" : between) : text,
+                    size: size,
+                    color: text.isEmpty ? NotchColor.secondaryText : .white,
+                    alignment: alignment,
+                    seconds: index.map { lyrics.duration(of: $0) } ?? 0
+                )
                     .id(index ?? -1)
                     .transition(.asymmetric(
                         insertion: .move(edge: .bottom).combined(with: .opacity),
@@ -152,6 +155,55 @@ struct LyricsLine: View {
         }
         .accessibilityElement()
         .accessibilityLabel(Text("Lyrics"))
+    }
+}
+
+/// One line of lyrics. A line too long for its space glides left partway through, so the end
+/// is read before the next line arrives, with its edges fading instead of cutting off.
+private struct LyricText: View {
+    let text: String
+    let size: CGFloat
+    let color: Color
+    let alignment: Alignment
+    /// How long the line is sung for.
+    let seconds: TimeInterval
+    @State private var overflow: CGFloat = 0
+    @State private var scrolled = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        GeometryReader { box in
+            Text(text)
+                .font(.system(size: size, weight: .semibold))
+                .foregroundStyle(color)
+                .lineLimit(1)
+                .fixedSize()
+                .background(GeometryReader { line in
+                    Color.clear.onAppear { overflow = max(0, (line.size.width - box.size.width).rounded(.up)) }
+                })
+                .offset(x: scrolled ? -overflow : 0)
+                .frame(width: box.size.width, height: box.size.height, alignment: overflow > 0 ? .leading : alignment)
+                .mask(fade(width: box.size.width))
+        }
+        .task(id: overflow) {
+            guard overflow > 0 else { return }
+            // Time to read the start, then one short glide to the end.
+            try? await Task.sleep(for: .seconds(LyricsScroll.delay(lineSeconds: seconds)))
+            withAnimation(reduceMotion ? nil : .smooth(duration: LyricsScroll.glide)) { scrolled = true }
+        }
+    }
+
+    private func fade(width: CGFloat) -> some View {
+        let edge = overflow > 0 ? min(10 / max(width, 1), 0.2) : 0
+        return LinearGradient(
+            stops: [
+                .init(color: scrolled ? .clear : .black, location: 0),
+                .init(color: .black, location: edge),
+                .init(color: .black, location: 1 - edge),
+                .init(color: scrolled ? .black : .clear, location: 1),
+            ],
+            startPoint: .leading, endPoint: .trailing
+        )
     }
 }
 

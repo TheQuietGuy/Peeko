@@ -308,7 +308,7 @@ private struct TopAppsCard: View {
     }
 }
 
-/// A Stats tile. Soft and rounded normally; in Brutal, a hard lemon edge and coral shadow.
+/// A Stats tile. Soft and rounded normally; in Brutal, a white outline on a pale offset plate.
 private struct StatsCard<Content: View>: View {
     let title: LocalizedStringKey
     let symbol: String
@@ -320,7 +320,7 @@ private struct StatsCard<Content: View>: View {
         let shape = RoundedRectangle(cornerRadius: (brutal ? 8 : 14) * s, style: .continuous)
         VStack(alignment: .leading, spacing: 3 * s) {
             Label(title, systemImage: symbol)
-                .font(.system(size: 10 * s, weight: brutal ? .heavy : .semibold))
+                .font(.system(size: 10 * s, weight: brutal ? .bold : .semibold))
                 .foregroundStyle(brutal ? BrutalPalette.edge : NotchColor.secondaryText)
                 .lineLimit(1)
             content()
@@ -330,7 +330,7 @@ private struct StatsCard<Content: View>: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         // Opaque in Brutal, so the hard shadow behind doesn't show through.
         .background(shape.fill(brutal ? Color(white: 0.09) : Color.white.opacity(0.07)))
-        .overlay { if brutal { shape.stroke(BrutalPalette.edge.opacity(0.85), lineWidth: 1.5 * s) } }
+        .overlay { if brutal { shape.strokeBorder(BrutalPalette.edge.opacity(0.9), lineWidth: BrutalPalette.edgeWidth) } }
         .background { if brutal { shape.fill(BrutalPalette.shadow).offset(x: 3 * s, y: 3 * s) } }
         .accessibilityElement(children: .combine)
     }

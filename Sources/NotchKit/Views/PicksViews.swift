@@ -163,7 +163,7 @@ struct CountdownsPanelBody: View {
         return VStack(alignment: .leading, spacing: 2 * s) {
             HStack(alignment: .firstTextBaseline, spacing: 4 * s) {
                 Text(label.value)
-                    .font(.system(size: 30 * s, weight: .bold, design: .rounded))
+                    .numeral(size: 30 * s, weight: .bold, design: .rounded)
                     .foregroundStyle(tint)
                     .contentTransition(.numericText(countsDown: true))
                 Text(label.caption)
@@ -181,7 +181,7 @@ struct CountdownsPanelBody: View {
         .padding(12 * s)
         .frame(width: 140 * s, height: 96 * s, alignment: .topLeading)
         .background(shape.fill(brutal ? Color(white: 0.09) : Color.white.opacity(0.07)))
-        .overlay { if brutal { shape.stroke(BrutalPalette.edge.opacity(0.85), lineWidth: 1.5 * s) } }
+        .overlay { if brutal { shape.strokeBorder(BrutalPalette.edge.opacity(0.9), lineWidth: BrutalPalette.edgeWidth) } }
         .background { if brutal { shape.fill(BrutalPalette.shadow).offset(x: 3 * s, y: 3 * s) } }
         .contextMenu {
             Button("Remove", role: .destructive) { model.picks.removeCountdown(item.id) }

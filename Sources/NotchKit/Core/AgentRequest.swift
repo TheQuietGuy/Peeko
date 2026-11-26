@@ -53,7 +53,7 @@ public enum AgentKind: String, CaseIterable, Sendable, Codable, Identifiable {
 
     /// The hook's answer in the tool's own format.
     public func output(for decision: AgentDecision) -> Data {
-        let reason = "Denied from Perch."
+        let reason = "Denied from Peeko."
         let object: [String: Any]
         switch (self, decision) {
         case (.claude, .ask), (.codex, .ask), (.copilot, .ask):
@@ -284,7 +284,7 @@ public enum AgentDecision: String, Sendable {
     public var claudeHookOutput: Data { AgentKind.claude.output(for: self) }
 }
 
-/// Adds or removes Perch's hook in an assistant's own settings file, leaving everything
+/// Adds or removes Peeko's hook in an assistant's own settings file, leaving everything
 /// else in the file as it was.
 public enum AgentHookSettings {
     /// Marks our hook, so it's found again whatever path the app is at.

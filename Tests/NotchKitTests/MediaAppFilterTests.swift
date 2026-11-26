@@ -79,6 +79,7 @@ struct NowPlayingAppChoiceTests {
         let now = Date()
         service.apply(playing("Song", "com.apple.finder", now: now), artworkData: nil, now: now)
         service.apply(playing("Video", "com.apple.dock", now: now), artworkData: nil, now: now)
+        service.settlePending(now: now.addingTimeInterval(2))
         #expect(service.otherSources.map(\.id) == ["com.apple.finder"])
         service.selectedSourceID = "com.apple.finder"
 

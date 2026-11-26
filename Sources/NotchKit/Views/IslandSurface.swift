@@ -8,6 +8,7 @@ struct IslandSurface: View, Animatable {
     var pulse: Double
     var liquid: Bool
     var brutal = false
+    var glyph = false
     /// The playing song's colour, from its artwork.
     var songColor: Color?
 
@@ -65,8 +66,31 @@ struct IslandSurface: View, Animatable {
                 layout.bubblePath
                     .fill(Color.black)
             }
+            if glyph, layout.brutalEdge > 0.001 {
+                glyphGrid(edge: layout.brutalEdge)
+            }
         }
         .frame(width: layout.canvasSize.width, height: layout.canvasSize.height, alignment: .topLeading)
+    }
+
+    /// Glyph's unlit LED dots, and a hairline edge, once the notch opens. The grid covers the
+    /// whole window and only its clip moves, so the dots are drawn once, not every frame.
+    private func glyphGrid(edge: Double) -> some View {
+        let shape = IslandShape(topRadius: layout.topRadius, bottomRadius: layout.bottomRadius, flare: layout.flare)
+        return ZStack(alignment: .topLeading) {
+            DotGrid(pitch: GlyphPalette.gridPitch, dot: GlyphPalette.gridDot, color: GlyphPalette.unlit)
+                .frame(width: layout.canvasSize.width, height: layout.canvasSize.height)
+                .mask(alignment: .topLeading) {
+                    shape
+                        .frame(width: max(layout.pill.width, 1), height: max(layout.pill.height, 1))
+                        .offset(x: layout.pill.minX, y: layout.pill.minY)
+                }
+            shape
+                .stroke(Color.white.opacity(0.16), lineWidth: 1)
+                .frame(width: max(layout.pill.width, 1), height: max(layout.pill.height, 1))
+                .offset(x: layout.pill.minX, y: layout.pill.minY)
+        }
+        .opacity(edge)
     }
 
     /// Only while the bubble splits off or merges back: the liquid "goo", which needs a blur

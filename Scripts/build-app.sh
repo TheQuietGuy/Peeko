@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Builds "Perch.app" into ./build. The bundle id and executable keep the app's first
+# Builds "Peeko.app" into ./build. The bundle id and executable keep the app's first
 # name (DynamicNotch), so settings, permissions and updates carry over.
 #
 #   CONFIG=release|debug        default: release
-#   SIGN_IDENTITY="Perch"   the self-made certificate releases use (see docs/SHIPPING.md),
+#   SIGN_IDENTITY="Peeko"   the self-made certificate releases use (see docs/SHIPPING.md),
 #                               or "Developer ID Application: Name (TEAMID)" later
 #                               default: "-" (ad-hoc, runs only on this Mac)
 #   VERSION=x.y.z               default: the VERSION file
@@ -18,7 +18,7 @@ SIGN_IDENTITY="${SIGN_IDENTITY:--}"
 VERSION="${VERSION:-$(tr -d '[:space:]' < "$ROOT/VERSION")}"
 BUILD_NUMBER="${BUILD_NUMBER:-$(git -C "$ROOT" rev-list --count HEAD 2>/dev/null || echo 1)}"
 BUNDLE_ID="${BUNDLE_ID:-com.rectircle.DynamicNotch}"
-APP="${APP_OUTPUT:-$ROOT/build/Perch.app}"
+APP="${APP_OUTPUT:-$ROOT/build/Peeko.app}"
 UPDATE_PUBLIC_KEY="$(tr -d '[:space:]' < "$ROOT/Support/UpdatePublicKey.txt")"
 if [[ -n "$UPDATE_PUBLIC_KEY" && ! "$UPDATE_PUBLIC_KEY" =~ ^[A-Za-z0-9+/]{43}=$ ]]; then
     echo "Invalid Support/UpdatePublicKey.txt (expected base64 Ed25519 public key)" >&2

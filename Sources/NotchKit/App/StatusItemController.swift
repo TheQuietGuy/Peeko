@@ -32,7 +32,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
             guard item == nil else { return }
             let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
             item.button?.image = PipGlyph.menuBarImage()
-            item.button?.toolTip = "Perch"
+            item.button?.toolTip = "Peeko"
             let menu = NSMenu()
             menu.delegate = self
             item.menu = menu
@@ -110,12 +110,12 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         let settings = action("Settings…") { [weak self] in self?.openSettings() }
         settings.keyEquivalent = ","
         menu.addItem(settings)
-        menu.addItem(action("About Perch") {
+        menu.addItem(action("About Peeko") {
             NSApp.activate()
             NSApp.orderFrontStandardAboutPanel(nil)
         })
         menu.addItem(.separator())
-        let quit = NSMenuItem(title: "Quit Perch", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        let quit = NSMenuItem(title: "Quit Peeko", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         menu.addItem(quit)
     }
 

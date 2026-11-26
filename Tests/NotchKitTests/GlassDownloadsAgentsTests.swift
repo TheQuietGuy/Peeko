@@ -8,7 +8,7 @@ struct GlassThemeTests {
     @Test func savesThemeAndClampsTint() {
         let defaults = UserDefaults(suiteName: "NotchTests-\(UUID().uuidString)")!
         let settings = SettingsStore(defaults: defaults)
-        #expect(settings.appearance.theme == .black, "Perch starts with the Dynamic Island look")
+        #expect(settings.appearance.theme == .black, "Peeko starts with the Dynamic Island look")
         settings.appearance.theme = .glass
         settings.appearance.glassTint = 7
         let reopened = SettingsStore(defaults: defaults)

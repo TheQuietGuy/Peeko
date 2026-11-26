@@ -71,9 +71,9 @@ public enum WeatherAPI {
         parts?.queryItems = [
             .init(name: "latitude", value: String(place.latitude)),
             .init(name: "longitude", value: String(place.longitude)),
-            .init(name: "current", value: "temperature_2m,apparent_temperature,relative_humidity_2m,wind_speed_10m,weather_code,is_day"),
+            .init(name: "current", value: "temperature_2m,apparent_temperature,relative_humidity_2m,wind_speed_10m,weather_code,is_day,uv_index"),
             .init(name: "hourly", value: "temperature_2m,weather_code,precipitation_probability,is_day"),
-            .init(name: "daily", value: "weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,sunrise,sunset"),
+            .init(name: "daily", value: "weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,sunrise,sunset,uv_index_max"),
             .init(name: "timezone", value: "auto"),
             .init(name: "forecast_days", value: "7"),
             .init(name: "temperature_unit", value: fahrenheit ? "fahrenheit" : "celsius"),
@@ -104,21 +104,23 @@ public enum WeatherAPI {
                       let temperature = temps[safe: index] ?? nil, let code = codes[safe: index] ?? nil else { continue }
                 hours.append(.init(time: date, temperature: temperature, code: Int(code),
                                    rainChance: (rain[safe: index] ?? nil).map { Int($0) }, isDay: ((day[safe: index] ?? nil) ?? 1) != 0))
-                if hours.count == 12 { break }
+                // The whole week, so each day can show its own hours.
+                if hours.count == 24 * 7 { break }
             }
         }
         var days: [WeatherForecast.Day] = []
         if let daily = root["daily"] as? [String: Any] {
             let times = strings(daily, "time"), highs = doubles(daily, "temperature_2m_max"), lows = doubles(daily, "temperature_2m_min")
             let codes = doubles(daily, "weather_code"), rain = doubles(daily, "precipitation_probability_max")
-            let sunrises = strings(daily, "sunrise"), sunsets = strings(daily, "sunset")
+            let sunrises = strings(daily, "sunrise"), sunsets = strings(daily, "sunset"), uv = doubles(daily, "uv_index_max")
             for index in times.indices {
                 guard let date = localDate(times[index], zone: zone, hasTime: false),
                       let high = highs[safe: index] ?? nil, let low = lows[safe: index] ?? nil, let code = codes[safe: index] ?? nil else { continue }
                 days.append(.init(date: date, high: high, low: low, code: Int(code),
                                   rainChance: (rain[safe: index] ?? nil).map { Int($0) },
                                   sunrise: sunrises[safe: index].flatMap { localDate($0, zone: zone, hasTime: true) },
-                                  sunset: sunsets[safe: index].flatMap { localDate($0, zone: zone, hasTime: true) }))
+                                  sunset: sunsets[safe: index].flatMap { localDate($0, zone: zone, hasTime: true) },
+                                  uv: uv[safe: index] ?? nil))
             }
         }
         return WeatherForecast(
@@ -126,6 +128,7 @@ public enum WeatherAPI {
             feelsLike: (currentBlock["apparent_temperature"] as? NSNumber)?.doubleValue,
             humidity: (currentBlock["relative_humidity_2m"] as? NSNumber)?.intValue,
             wind: (currentBlock["wind_speed_10m"] as? NSNumber)?.doubleValue,
+            uv: (currentBlock["uv_index"] as? NSNumber)?.doubleValue,
             hours: hours, days: days, timeZone: zone
         )
     }
@@ -180,6 +183,8 @@ public struct WeatherForecast: Equatable, Sendable {
         public var rainChance: Int?
         public var sunrise: Date?
         public var sunset: Date?
+        /// The day's highest UV index.
+        public var uv: Double? = nil
         public var id: Date { date }
         public var symbolName: String { WeatherCodes.symbol(for: code, isDay: true) }
     }
@@ -188,6 +193,7 @@ public struct WeatherForecast: Equatable, Sendable {
     public var feelsLike: Double?
     public var humidity: Int?
     public var wind: Double?
+    public var uv: Double? = nil
     public var hours: [Hour]
     public var days: [Day]
     /// The place's time zone, so hours read as they do there.
@@ -203,9 +209,19 @@ public struct WeatherForecast: Equatable, Sendable {
         return ((day.low - low) / span)...((day.high - low) / span)
     }
 
-    /// "Rain likely around 15:00": the first coming hour with a 50 % chance or more.
+    /// "Rain likely around 15:00": the first of the next 12 hours with a 50 % chance or more.
     public var rainAlert: Hour? {
-        hours.first { ($0.rainChance ?? 0) >= 50 }
+        hours.prefix(12).first { ($0.rainChance ?? 0) >= 50 }
+    }
+
+    /// The hours to show for a day: the next eight from now for today, and every three hours
+    /// across any other day, like tapping a day in Apple's Weather.
+    public func hours(for day: Day) -> [Hour] {
+        guard day != today else { return Array(hours.prefix(8)) }
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = timeZone
+        let ofDay = hours.filter { calendar.isDate($0.time, inSameDayAs: day.date) }
+        return Array(stride(from: 0, to: ofDay.count, by: 3).map { ofDay[$0] }.prefix(8))
     }
 }
 

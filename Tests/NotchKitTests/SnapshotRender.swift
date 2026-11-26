@@ -99,11 +99,14 @@ struct SnapshotRender {
     }
 
     /// The whole notch window as the app draws it, for each main view, over a plain wallpaper.
-    @Test func screens() async throws {
+    @Test(arguments: NotchTheme.allCases) func screens(theme: NotchTheme) async throws {
         guard folder != nil else { return }
         let defaults = UserDefaults(suiteName: "snap-\(UUID().uuidString)")!
-        let model = IslandModel(settings: SettingsStore(defaults: defaults), tray: TrayStore(folder: nil), notes: NotesStore(defaults: defaults))
+        let picks = PicksStore(defaults: defaults)
+        picks.addCountdown("Algorithms exam", date: Date().addingTimeInterval(86400 * 9))
+        let model = IslandModel(settings: SettingsStore(defaults: defaults), tray: TrayStore(folder: nil, defaults: nil), notes: NotesStore(defaults: defaults), picks: picks)
         model.screen = .sample
+        model.settings.appearance.theme = theme
         let display = DisplayContext()
         display.id = model.activeDisplayID
         display.metrics = .sample
@@ -113,7 +116,7 @@ struct SnapshotRender {
                 LinearGradient(colors: [Color(red: 0.36, green: 0.45, blue: 0.62), Color(red: 0.55, green: 0.42, blue: 0.5)], startPoint: .top, endPoint: .bottom)
                 IslandRootView(model: model, display: display)
             }
-            try save(view, size: layout.canvasSize, as: "screen-" + name)
+            try save(view, size: layout.canvasSize, as: "screen-\(theme.rawValue)-" + name)
         }
         try shot("rest")
         model.showTab(.home); try shot("home")
@@ -125,6 +128,8 @@ struct SnapshotRender {
         model.open(.weather); try shot("weather-tab")
         model.open(.timer); try shot("timers")
         model.showTab(.calendar); try shot("calendar")
+        model.open(.countdowns); try shot("countdowns")
+        model.open(.colors); try shot("colors")
         model.collapse()
         model.startTimer(300); try shot("compact-timer")
         model.expand(.activity(.timer)); try shot("expanded-timer")
@@ -134,7 +139,7 @@ struct SnapshotRender {
 
     @Test func weather() throws {
         guard folder != nil else { return }
-        let forecast = try #require(WeatherAPI.forecast(from: WeatherForecastTests.sample, city: "London", now: WeatherForecastTests.noon))
+        let forecast = try #require(WeatherAPI.forecast(from: WeatherForecastTests.week(), city: "London", now: WeatherForecastTests.noon))
         let width = IslandMetrics.Nook.width, height = IslandMetrics.Nook.weatherBody
         let view = WeatherForecastView(forecast: forecast, status: .ready, updatedAt: Date())
             .padding(.horizontal, 20)
@@ -177,7 +182,7 @@ struct SnapshotRender {
         guard folder != nil else { return }
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent("tray-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        let names = ["Week 7 meeting notes.pdf", "Perch icon.png", "CV final.docx", "budget.xlsx", "holiday photo.jpg", "slides.key"]
+        let names = ["Week 7 meeting notes.pdf", "Peeko icon.png", "CV final.docx", "budget.xlsx", "holiday photo.jpg", "slides.key"]
         let urls = try names.map { name -> URL in
             let url = dir.appendingPathComponent(name)
             try Data("x".utf8).write(to: url)

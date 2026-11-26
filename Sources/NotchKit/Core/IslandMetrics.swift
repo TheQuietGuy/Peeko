@@ -22,6 +22,8 @@ public enum IslandMetrics {
     public static let musicEarTrim: CGFloat = 14
     /// The line of lyrics that hangs under the compact music shape.
     public static let compactLyrics: CGFloat = 20
+    /// Extra width each side while lyrics show, so most lines fit without scrolling.
+    public static let compactLyricsEar: CGFloat = 36
 
     /// The open music view is 1.79 times as wide as it is tall, like the Dynamic Island's
     /// player (321 by 179).

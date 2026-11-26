@@ -63,7 +63,7 @@ final class DebugHooks {
         case "checkupdate": model.updater.check()
         case "lockpreview": lockScreen?.preview(parts.dropFirst().first != "off")
         case "fakeupdate":
-            let base = "https://github.com/shandilyaswagat/dynamic_ledge/releases"
+            let base = "https://github.com/TheQuietGuy/Peeko/releases"
             model.updater.simulateAvailable(ReleaseInfo(version: SemanticVersion("9.9.9")!, diskImage: URL(string: base + "/download/v9.9.9/DynamicNotch.dmg")!, checksum: nil, signedManifest: URL(string: base + "/download/v9.9.9/DynamicNotch.update.json")!, page: URL(string: base)!))
         // Starts the approval socket without touching Claude Code's settings.
         // Only the running app: saving the setting would add hooks to real tools on next launch.

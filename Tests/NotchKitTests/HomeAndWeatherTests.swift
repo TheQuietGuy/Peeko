@@ -91,6 +91,45 @@ struct WeatherForecastTests {
         #expect(abs(range.lowerBound - 1.1 / 8) < 0.0001 && abs(range.upperBound - 6.2 / 8) < 0.0001)
     }
 
+    /// Two full days of hours and a week, for a day's own hours.
+    static func week() -> Data {
+        var times: [String] = [], temps: [Double] = [], codes: [Int] = [], rain: [Int] = [], day: [Int] = []
+        for d in 22...23 { for h in 0..<24 {
+            times.append(String(format: "2026-11-%02dT%02d:00", d, h)); temps.append(Double(h) / 2)
+            codes.append(h > 12 ? 61 : 3); rain.append(h * 4); day.append(h >= 8 && h < 16 ? 1 : 0)
+        } }
+        let days = (22...28).map { String(format: "2026-11-%02d", $0) }
+        let json: [String: Any] = [
+            "utc_offset_seconds": 0,
+            "current": ["temperature_2m": 9.4, "weather_code": 3, "is_day": 1, "uv_index": 1.4],
+            "hourly": ["time": times, "temperature_2m": temps, "weather_code": codes, "precipitation_probability": rain, "is_day": day],
+            "daily": ["time": days, "weather_code": Array(repeating: 3, count: 7), "temperature_2m_max": (0..<7).map { 10.0 + Double($0) },
+                      "temperature_2m_min": Array(repeating: 4.0, count: 7), "precipitation_probability_max": Array(repeating: 20, count: 7),
+                      "sunrise": days.map { $0 + "T07:30" }, "sunset": days.map { $0 + "T16:00" }, "uv_index_max": Array(repeating: 2.6, count: 7)],
+        ]
+        return try! JSONSerialization.data(withJSONObject: json)
+    }
+
+    @Test func eachDayHasItsOwnHours() throws {
+        let forecast = try #require(WeatherAPI.forecast(from: Self.week(), city: "London", now: Self.noon))
+        #expect(forecast.uv == 1.4 && forecast.today?.uv == 2.6)
+        let today = try #require(forecast.today)
+        #expect(forecast.hours(for: today).count == 8)
+        #expect(forecast.hours(for: today).first?.time == ISO8601DateFormatter().date(from: "2026-11-22T13:00:00Z"), "from now")
+        let tomorrow = forecast.days[1]
+        let hours = forecast.hours(for: tomorrow)
+        #expect(hours.count == 8, "every three hours across the day")
+        #expect(hours.map { Calendar(identifier: .gregorian).dateComponents(in: TimeZone(identifier: "UTC")!, from: $0.time).hour } == [0, 3, 6, 9, 12, 15, 18, 21])
+        #expect(forecast.hours(for: forecast.days[3]).isEmpty, "no hours that far out in this sample")
+        #expect(forecast.rainAlert?.rainChance == 52, "the first hour at 50 % or more, within the next 12")
+    }
+
+    @Test func uvBands() {
+        #expect(WeatherText.uv(1.4) == "UV 1 Low")
+        #expect(WeatherText.uv(6.2) == "UV 6 High")
+        #expect(WeatherText.uv(11) == "UV 11 Extreme")
+    }
+
     @Test func labels() {
         #expect(WeatherText.rain(10) == "")
         #expect(WeatherText.rain(55) == "60%")

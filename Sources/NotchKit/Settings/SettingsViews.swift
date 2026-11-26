@@ -65,7 +65,7 @@ struct GeneralSettingsView: View {
                     SettingsCategoryIcon(symbol: "gearshape.fill", tileColor: .gray, size: 52)
                     Text("General")
                         .font(.system(size: 22, weight: .bold))
-                    Text("Manage your setup and preferences for Perch, including startup, software updates, media, and coding assistants.")
+                    Text("Manage your setup and preferences for Peeko, including startup, software updates, media, and coding assistants.")
                         .font(.system(size: 13))
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
@@ -137,7 +137,7 @@ struct GeneralSettingsView: View {
                     .onChange(of: launchAtLogin) { _, enabled in setLaunchAtLogin(enabled) }
                 if needsApproval {
                     HStack {
-                        Text("Allow Perch in Login Items to finish.")
+                        Text("Allow Peeko in Login Items to finish.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                         Spacer()
@@ -166,7 +166,7 @@ struct GeneralSettingsView: View {
                     Text("All displays").tag(DisplayChoice.all)
                 }
             } footer: {
-                Text("Built-in display keeps it on your MacBook's notch. Pick a screen by name to keep it there, or All displays to show it on every screen: music, timers and alerts appear everywhere, and what you open shows on the screen you're using. Screens without a notch get a notch of their own at the top, which stays out of sight until something's showing or you rest the pointer on its spot. When the menu bar icon is hidden, open Perch again from Applications to get back here.")
+                Text("Built-in display keeps it on your MacBook's notch. Pick a screen by name to keep it there, or All displays to show it on every screen: music, timers and alerts appear everywhere, and what you open shows on the screen you're using. Screens without a notch get a notch of their own at the top, which stays out of sight until something's showing or you rest the pointer on its spot. When the menu bar icon is hidden, open Peeko again from Applications to get back here.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -359,6 +359,7 @@ struct AppearanceSettingsView: View {
                     themeCard(title: "Black", theme: .black, isSelected: settings.appearance.theme == .black)
                     themeCard(title: "Glass", theme: .glass, isSelected: settings.appearance.theme == .glass)
                     themeCard(title: "Brutal", theme: .brutal, isSelected: settings.appearance.theme == .brutal)
+                    themeCard(title: "Dot Matrix", theme: .glyph, isSelected: settings.appearance.theme == .glyph)
                 }
                 .padding(.vertical, 8)
                 .frame(maxWidth: .infinity)
@@ -389,8 +390,10 @@ struct AppearanceSettingsView: View {
             } footer: {
                 Text(settings.appearance.theme == .glass
                     ? "Frosted glass that blurs what’s behind it, with softer, springier motion. The part around the camera stays black. More tint is easier to read over bright windows."
+                    : settings.appearance.theme == .glyph
+                    ? "Monochrome, like an LED display: pure black with a faint grid of unlit dots once it opens. Big numbers and the music bars light up in dots, red is kept for what's urgent, and it moves with precision. At rest it's still just the notch."
                     : settings.appearance.theme == .brutal
-                    ? "Loud and honest: once it opens, the notch gets a thick lemon edge and a hard coral shadow, buttons press down like real keys, and it snaps into place without wobbling. At rest it’s still just the notch."
+                    ? "Graphic, like a printed poster: once it opens, the notch gets a crisp white outline and a solid offset plate instead of a soft shadow, buttons are black keys that press down, and it snaps into place without wobbling. Colour comes only from what's happening, like the song's colour on the plate. At rest it's still just the notch."
                     : "The notch itself grows to show what’s happening. Pitch black removes the shadow and outline so the extension is indistinguishable from the notch. On a screen without a notch, it appears in the same spot at the top.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -536,7 +539,7 @@ struct NowPlayingSettingsView: View {
                 if settings.nowPlayingEnabled {
                     IconToggle(title: "Lyrics", detail: "Timed lyrics under the song, when available. The song name and artist are looked up on lrclib.net", symbol: "quote.bubble.fill", color: .pink, isOn: $settings.lyricsEnabled)
                     if SystemAudioTap.isSupported {
-                        IconToggle(title: "Live music bars", detail: "The bars move with the music. Perch measures your Mac's sound while something plays; nothing is recorded or sent. macOS asks for access once", symbol: "waveform", color: .pink, isOn: $settings.liveMusicBars)
+                        IconToggle(title: "Live music bars", detail: "The bars move with the music. Peeko measures your Mac's sound while something plays; nothing is recorded or sent. macOS asks for access once", symbol: "waveform", color: .pink, isOn: $settings.liveMusicBars)
                     }
                 }
                 if !nowPlaying.isAvailable {
@@ -704,7 +707,7 @@ private struct AIUsageSettingsSection: View {
         } header: {
             Text("AI Agent Usage")
         } footer: {
-            Text("Off until you turn it on. Codex checks your limits with OpenAI using its own sign-in; Antigravity's are read on this Mac. Perch sends nothing itself and needs no API keys. Claude Code isn't listed: it keeps your limits only on Anthropic's servers, which would mean using your Claude sign-in.")
+            Text("Off until you turn it on. Codex checks your limits with OpenAI using its own sign-in; Antigravity's are read on this Mac. Peeko sends nothing itself and needs no API keys. Claude Code isn't listed: it keeps your limits only on Anthropic's servers, which would mean using your Claude sign-in.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
@@ -716,7 +719,7 @@ private struct AIUsageSettingsSection: View {
             } header: {
                 Text("Assistants")
             } footer: {
-                Text("Every 5 minutes, Perch checks the assistants you tick. Only the ones it can reach appear in the notch.")
+                Text("Every 5 minutes, Peeko checks the assistants you tick. Only the ones it can reach appear in the notch.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -884,7 +887,7 @@ struct HomeSettingsView: View {
                 IconToggle(title: "File Tray", detail: "Files you drop on the notch, or saved document windows. Up to 30; clears when the app quits, except pinned ones", symbol: "tray.full.fill", color: .cyan, isOn: $settings.trayEnabled)
                 if settings.trayEnabled {
                     Button("Allow document window dragging…") { DocumentWindowDrag.requestAccess() }
-                    Text("Enable Perch in macOS Accessibility settings to store a saved document by dragging its whole window to the notch. The source app must expose its saved document location. Some apps also ask for Automation access. Unsaved or ambiguous documents cannot be stored.")
+                    Text("Enable Peeko in macOS Accessibility settings to store a saved document by dragging its whole window to the notch. The source app must expose its saved document location. Some apps also ask for Automation access. Unsaved or ambiguous documents cannot be stored.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -1015,7 +1018,7 @@ struct ShortcutsSettingsView: View {
 // MARK: About
 
 struct AboutSettingsView: View {
-    private static let repository = URL(string: "https://github.com/shandilyaswagat/dynamic_ledge")!
+    private static let repository = URL(string: "https://github.com/TheQuietGuy/Peeko")!
     private static let website = URL(string: "https://talvioh.vercel.app")!
     private var info: [String: Any] { Bundle.main.infoDictionary ?? [:] }
 
@@ -1026,7 +1029,7 @@ struct AboutSettingsView: View {
                     Image(nsImage: NSApplication.shared.applicationIconImage)
                         .resizable()
                         .frame(width: 72, height: 72)
-                    Text("Perch")
+                    Text("Peeko")
                         .font(.system(size: 22, weight: .bold))
                     Text("A small friend that lives on your Mac’s notch.")
                         .font(.system(size: 13))
@@ -1096,7 +1099,7 @@ struct SoftwareUpdateSettingsView: View {
                         .resizable()
                         .frame(width: 44, height: 44)
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Perch")
+                        Text("Peeko")
                             .font(.headline)
                         if let current = updater.currentVersion {
                             Text("Version \(current.description)")
@@ -1115,7 +1118,7 @@ struct SoftwareUpdateSettingsView: View {
                             .padding(.vertical, 4)
                         HStack {
                             VStack(alignment: .leading, spacing: 2) {
-                                Text("Perch \(release.version.description)")
+                                Text("Peeko \(release.version.description)")
                                     .font(.headline)
                                 Text("1 update available")
                                     .font(.subheadline)
@@ -1138,7 +1141,7 @@ struct SoftwareUpdateSettingsView: View {
             } header: {
                 Text("Automatic Updates")
             } footer: {
-                Text("Checks for updates automatically in the background. When enabled, verified updates install and Perch relaunches.")
+                Text("Checks for updates automatically in the background. When enabled, verified updates install and Peeko relaunches.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -1281,6 +1284,10 @@ private struct MiniNotch<Content: View>: View {
                 shape.fill(BrutalPalette.shadow).offset(x: 3, y: 3)
                 shape.fill(.black)
                 shape.stroke(BrutalPalette.edge, lineWidth: 1.5)
+            } else if theme == .glyph && !compact {
+                shape.fill(.black)
+                DotGrid(pitch: 4, dot: 1, color: GlyphPalette.unlit.opacity(2)).clipShape(shape)
+                shape.stroke(Color.white.opacity(0.18), lineWidth: 0.75)
             } else {
                 shape.fill(.black)
             }
@@ -1394,8 +1401,12 @@ private struct HomePageSection: View {
         Section {
             let on = settings.homeWidgets
             let off = HomeWidget.allCases.filter { !on.contains($0) }
-            ForEach(on + off) { widget in
+            ForEach(on) { widget in
                 HomeWidgetRow(settings: settings, widget: widget, position: on.firstIndex(of: widget), count: on.count)
+            }
+            .onMove { from, to in settings.homeWidgets.move(fromOffsets: from, toOffset: to) }
+            ForEach(off) { widget in
+                HomeWidgetRow(settings: settings, widget: widget, position: nil, count: on.count)
             }
             HStack {
                 Spacer()
@@ -1405,7 +1416,7 @@ private struct HomePageSection: View {
         } header: {
             Text("Home Page")
         } footer: {
-            Text("Home shows the first three switched-on widgets that have something to show, left to right. Use the arrows to reorder. Weather needs a city (below).")
+            Text("Home shows the first three switched-on widgets that have something to show, left to right. Drag a switched-on widget to reorder, or use its arrows. Weather needs a city (below).")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }

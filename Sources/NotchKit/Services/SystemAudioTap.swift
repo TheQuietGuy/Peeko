@@ -64,7 +64,7 @@ final class SystemAudioTap: @unchecked Sendable {
         queue.sync { sampleRate = rate; samples.removeAll(keepingCapacity: true) }
 
         let aggregate: [String: Any] = [
-            kAudioAggregateDeviceNameKey: "Perch music bars",
+            kAudioAggregateDeviceNameKey: "Peeko music bars",
             kAudioAggregateDeviceUIDKey: "DynamicLedge.bars.\(UUID().uuidString)",
             kAudioAggregateDeviceMainSubDeviceKey: outputUID,
             kAudioAggregateDeviceIsPrivateKey: true,

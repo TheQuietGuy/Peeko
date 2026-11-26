@@ -143,6 +143,7 @@ public final class AgentBridge {
         let suffix = (Bundle.main.bundleIdentifier ?? "DynamicNotch").split(separator: ".").last.map(String.init) ?? "app"
         let name = "agent-\(suffix).sock"
         if let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first?
+            // Keeps the earlier name (Perch), so installed hooks keep finding it.
             .appendingPathComponent("Perch", isDirectory: true) {
             let path = support.appendingPathComponent(name).path
             if path.utf8.count < 100 {

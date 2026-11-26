@@ -108,7 +108,7 @@ final class DocumentWindowDrag {
         return URL(fileURLWithPath: (text as NSString).expandingTildeInPath)
     }
 
-    /// Whether Perch may send Apple Events to the app, asking the user if it hasn't been decided.
+    /// Whether Peeko may send Apple Events to the app, asking the user if it hasn't been decided.
     /// Blocks until they answer, so it runs off the main thread (see `resolve`).
     private nonisolated static func automationPermission(for bundleIdentifier: String) -> OSStatus {
         var target = AEAddressDesc()
@@ -126,7 +126,7 @@ final class DocumentWindowDrag {
         guard chromium.contains(identifier) || safari.contains(identifier) || editors.contains(identifier) else {
             return Resolution(message: "This app does not expose the saved document location for this window.")
         }
-        // Ask macOS first, and wait for the answer: the first time it shows "Allow Perch to
+        // Ask macOS first, and wait for the answer: the first time it shows "Allow Peeko to
         // control …", and the script below has a short deadline that used to cut that prompt off.
         let appName = NSWorkspace.shared.urlForApplication(withBundleIdentifier: identifier)
             .map { FileManager.default.displayName(atPath: $0.path).replacingOccurrences(of: ".app", with: "") } ?? identifier
@@ -177,7 +177,7 @@ final class DocumentWindowDrag {
             process.waitUntilExit()
             _ = errors.fileHandleForReading.readDataToEndOfFile()
             guard process.terminationStatus == 0 else {
-                return Resolution(message: "Could not read this open document. Enable Perch access to the document app in macOS Automation settings, then try again.")
+                return Resolution(message: "Could not read this open document. Enable Peeko access to the document app in macOS Automation settings, then try again.")
             }
             let value = String(decoding: bytes, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
             if let url = localURL(value), FileManager.default.fileExists(atPath: url.path) { return Resolution(url: url) }

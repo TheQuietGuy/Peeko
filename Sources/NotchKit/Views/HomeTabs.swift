@@ -527,20 +527,21 @@ private struct QuickActionLabel: View {
             .fixedSize()
     }
 
-    /// Brutal: a flat block in the action's colour on a hard coral shadow; pressing pushes it
-    /// onto the shadow at once, like a key.
+    /// Brutal: a black key with a white outline and the action's colour on its label, on a pale
+    /// plate; pressing pushes it onto the plate at once.
     private var brutalBody: some View {
         let depth = 2.5 * scale
         let pressed = configuration.isPressed
         let shape = RoundedRectangle(cornerRadius: 6 * scale, style: .continuous)
         return configuration.label
-            .font(.system(size: 12 * scale, weight: .heavy))
+            .font(.system(size: 12 * scale, weight: .bold))
             .monospacedDigit()
             .lineLimit(1)
-            .foregroundStyle(.black)
+            .foregroundStyle(tint)
             .padding(.horizontal, 9 * scale)
             .frame(minWidth: width, minHeight: 24 * scale, maxHeight: 24 * scale)
-            .background(shape.fill(isHovering ? tint.opacity(0.85) : tint))
+            .background(shape.fill(isHovering ? BrutalPalette.keyHover : BrutalPalette.key))
+            .overlay(shape.strokeBorder(BrutalPalette.edge, lineWidth: BrutalPalette.edgeWidth))
             .background(shape.fill(BrutalPalette.shadow).offset(x: pressed ? 0 : depth, y: pressed ? 0 : depth))
             .offset(x: pressed ? depth : 0, y: pressed ? depth : 0)
             .padding(.trailing, depth)
@@ -796,6 +797,7 @@ struct MirrorBody: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(.bottom, 2 * s)
+        .onAppear { model.camera.refresh() }
     }
 
     private static func message(_ state: CameraAccess.State, isOff: Bool) -> LocalizedStringKey {
@@ -805,14 +807,14 @@ struct MirrorBody: View {
                 ? "Camera preview is turned off."
                 : "Check how you look before a call. The camera turns off when you close this."
         case .notAsked: "Check how you look before a call."
-        case .denied: "Camera access is off for Perch."
+        case .denied: "Camera access is off for Peeko."
         case .noCamera: "No camera found."
         }
     }
 }
 
 /// One place in the navigation bar: an icon, and its name too when it's where you are, so you
-/// always know which view is open. Brutal draws the current one as a lemon block.
+/// always know which view is open. Brutal draws the current one as a white block.
 private struct NavChip: View {
     let symbol: String
     let name: String
@@ -829,7 +831,7 @@ private struct NavChip: View {
                 .font(.system(size: 11 * s, weight: .semibold))
             if named {
                 Text(name)
-                    .font(.system(size: 11 * s, weight: brutal ? .heavy : .semibold))
+                    .font(.system(size: 11 * s, weight: brutal ? .bold : .semibold))
                     .lineLimit(1)
                     .fixedSize()
             }

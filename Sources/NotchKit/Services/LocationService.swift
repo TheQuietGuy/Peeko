@@ -9,7 +9,7 @@ import Observation
 @Observable
 public final class LocationService: NSObject {
     public enum Failure: Error, Equatable, Sendable {
-        /// Location Services is off, or Perch isn't allowed in System Settings.
+        /// Location Services is off, or Peeko isn't allowed in System Settings.
         case denied
         /// macOS couldn't work out where the Mac is right now.
         case unavailable

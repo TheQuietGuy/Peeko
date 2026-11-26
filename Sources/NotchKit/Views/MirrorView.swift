@@ -12,7 +12,8 @@ final class CameraAccess {
         case noCamera
     }
 
-    private(set) var state: State = CameraAccess.current()
+    /// Unknown until Mirror first opens, so launching Peeko never touches the camera system.
+    private(set) var state: State = .notAsked
     var isCameraOff: Bool = false
 
     func refresh() {
@@ -38,8 +39,12 @@ final class CameraAccess {
         }
     }
 
+    /// Looking for a camera is slow (it walks every capture device), so it happens once.
+    private static var hasCamera: Bool?
+
     private static func current() -> State {
-        guard AVCaptureDevice.default(for: .video) != nil else { return .noCamera }
+        if hasCamera == nil { hasCamera = AVCaptureDevice.default(for: .video) != nil }
+        guard hasCamera == true else { return .noCamera }
         switch AVCaptureDevice.authorizationStatus(for: .video) {
         case .authorized: return .granted
         case .notDetermined: return .notAsked

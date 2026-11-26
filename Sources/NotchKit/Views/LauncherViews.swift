@@ -239,7 +239,7 @@ struct RemindersPanelBody: View {
                 reminders.requestAccess()
             }
         case .denied:
-            ConnectPrompt(text: "Reminders access is off for Perch.", button: "Open Settings", tint: .white) {
+            ConnectPrompt(text: "Reminders access is off for Peeko.", button: "Open Settings", tint: .white) {
                 reminders.openPrivacySettings()
             }
         case .granted:

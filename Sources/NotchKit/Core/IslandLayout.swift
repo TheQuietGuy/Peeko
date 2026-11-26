@@ -393,7 +393,7 @@ public struct LayoutEngine: Equatable, Sendable {
         layout.contentScale = scale
         layout.notchBand = isVirtualNotch ? 0 : notch.maxY
 
-        if appearance.theme == .glass || (appearance.pitchBlack && appearance.theme != .brutal) {
+        if appearance.theme == .glass || (appearance.pitchBlack && appearance.theme == .black) {
             // Glass draws its own edge; Brutal always needs its outline.
             layout.shadow = 0
             layout.stroke = 0
@@ -490,7 +490,9 @@ public struct LayoutEngine: Equatable, Sendable {
             layout.shadow = 0.2
             layout.content = layout.pill.insetBy(dx: IslandMetrics.compactFlare, dy: 0)
         case .compact(let primary, let secondary):
-            layout.pill = shape(body: compactBodyWidth(for: primary), height: height + compactLyricsHeight(for: primary, home: home), flare: IslandMetrics.compactFlare)
+            let lyrics = compactLyricsHeight(for: primary, home: home)
+            let lyricsEars = lyrics > 0 ? 2 * (IslandMetrics.compactLyricsEar * scale).rounded() : 0
+            layout.pill = shape(body: compactBodyWidth(for: primary) + lyricsEars, height: height + lyrics, flare: IslandMetrics.compactFlare)
             layout.shadow = 0.3
             layout.content = layout.pill.insetBy(dx: IslandMetrics.compactFlare, dy: 0)
             layout.cameraGap = cameraGap

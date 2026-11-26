@@ -3,7 +3,10 @@ import Observation
 
 /// Another app that was playing when a newer one took over Now Playing, and may still be.
 public struct MediaSource: Identifiable {
+    /// The app's bundle identifier, plus "#title" for a second tab of the app that's showing.
     public var id: String
+    /// The app behind it.
+    public var bundleID: String { String(id.split(separator: "#", maxSplits: 1).first ?? "") }
     public var name: String
     public var icon: NSImage?
     public var info: NowPlayingInfo
@@ -70,6 +73,16 @@ public final class NowPlayingService {
     @ObservationIgnored private var pruneTask: Task<Void, Never>?
     /// A source with no track length is kept this long after it stopped being current.
     static let otherSourceLimit: TimeInterval = 20 * 60
+    /// How long a report from a different tab or app waits before taking over the shown one.
+    static let switchDelay: TimeInterval = 1.5
+
+    /// Which source is showing: its app, plus "#title" when it's a second tab of that app.
+    @ObservationIgnored private var currentKey: String?
+    /// When the showing source last reported, to tell cross-talk from a real switch.
+    @ObservationIgnored private var lastShownReport = Date.distantPast
+    /// A report from another source, waiting to see whether the showing one goes quiet.
+    @ObservationIgnored private var pending: (key: String, info: NowPlayingInfo, artwork: Data?, accent: ColorMath.RGB?, since: Date)?
+    @ObservationIgnored private var settleTask: Task<Void, Never>?
 
     public init() {
         bridge.onMessage = { [weak self] message in self?.handle(message) }
@@ -95,7 +108,7 @@ public final class NowPlayingService {
     public func open(_ source: MediaSource) {
         if let pid = source.info.processIdentifier, let app = NSRunningApplication(processIdentifier: pid), app.activationPolicy == .regular {
             app.activate()
-        } else if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: source.id) {
+        } else if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: source.bundleID) {
             NSWorkspace.shared.openApplication(at: url, configuration: NSWorkspace.OpenConfiguration())
         }
     }
@@ -155,8 +168,10 @@ public final class NowPlayingService {
         }
     }
 
-    func apply(_ newInfo: NowPlayingInfo?, artworkData: Data?, accent newAccent: ColorMath.RGB? = nil, now: Date = Date()) {
+    func apply(_ newInfo: NowPlayingInfo?, artworkData: Data?, accent newAccent: ColorMath.RGB? = nil, now: Date = Date(), settled: Bool = false) {
         guard var newInfo else {
+            pending = nil
+            currentKey = nil
             info = nil
             artwork = nil
             accent = .white
@@ -176,6 +191,20 @@ public final class NowPlayingService {
             return
         }
 
+        // Two tabs or apps playing at once: macOS reports whichever spoke last, so a report from a
+        // different source waits a moment. If the showing one speaks again first it was just
+        // cross-talk: the other goes in the switcher instead of the view flipping back and forth.
+        let key = sourceKey(for: newInfo, identifier: identifier)
+        if !settled, let shown = info, shown.isPlaying, newInfo.isPlaying, let currentKey, key != currentKey {
+            if pending?.key != key { pending = (key, newInfo, artworkData, newAccent, now) } else {
+                pending?.info = newInfo
+                if artworkData != nil { pending?.artwork = artworkData; pending?.accent = newAccent }
+            }
+            scheduleSettle()
+            return
+        }
+        if key == currentKey, !settled { lastShownReport = now }
+
         if let expected = expectedPlayState {
             if now >= expected.until || newInfo.isPlaying == expected.isPlaying {
                 expectedPlayState = nil
@@ -191,6 +220,8 @@ public final class NowPlayingService {
         let previous = snapshotOfCurrent(at: now)
         updateArtwork(for: newInfo, data: artworkData, accent: newAccent)
         updateSourceApp(identifier)
+        if key != currentKey, settled { lastShownReport = .distantPast }
+        currentKey = key
         trackOtherSources(previous: previous, now: now)
 
         let wasPlaying = info?.isPlaying ?? false
@@ -257,7 +288,7 @@ public final class NowPlayingService {
     // MARK: Filter
 
     private func applyFilterChange() {
-        otherSources.removeAll { !appFilter.allows($0.id) }
+        otherSources.removeAll { !appFilter.allows($0.bundleID) }
         if let selectedSourceID, !otherSources.contains(where: { $0.id == selectedSourceID }) {
             self.selectedSourceID = nil
         }
@@ -270,14 +301,59 @@ public final class NowPlayingService {
 
     // MARK: Other sources
 
+    /// The app behind a report; for a second tab of the app that's showing (another title, not
+    /// starting from the top, so not just the next song) the app plus its title.
+    private func sourceKey(for info: NowPlayingInfo, identifier: String?) -> String {
+        let app = identifier ?? "unknown"
+        guard let shown = self.info, let currentKey, currentKey.split(separator: "#").first.map(String.init) == app else { return app }
+        if info.title == shown.title || (info.elapsed ?? 0) < 5 { return currentKey }
+        return app + "#" + info.title
+    }
+
+    private func scheduleSettle() {
+        settleTask?.cancel()
+        settleTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(Self.switchDelay))
+            guard !Task.isCancelled else { return }
+            self?.settlePending()
+        }
+    }
+
+    /// The waiting source takes over if the showing one has gone quiet; otherwise both are
+    /// playing, and the waiting one is listed in the switcher.
+    func settlePending(now: Date = Date()) {
+        guard let pending, now.timeIntervalSince(pending.since) >= Self.switchDelay - 0.01 else { return }
+        self.pending = nil
+        if lastShownReport > pending.since {
+            let app = pending.key.split(separator: "#").first.map(String.init) ?? pending.key
+            let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: app)
+            let source = MediaSource(
+                id: pending.key,
+                // A second tab is named by what it plays: two "Safari" buttons wouldn't help.
+                name: pending.key.contains("#") ? pending.info.title
+                    : url.map { FileManager.default.displayName(atPath: $0.path).replacingOccurrences(of: ".app", with: "") } ?? app,
+                icon: url.map { NSWorkspace.shared.icon(forFile: $0.path) },
+                info: pending.info,
+                artwork: pending.artwork.flatMap(NSImage.init(data:)),
+                accent: pending.accent ?? pending.artwork.map(ArtworkTint.accent(of:)) ?? .white,
+                since: now
+            )
+            otherSources.removeAll { $0.id == source.id }
+            otherSources.insert(source, at: 0)
+            schedulePrune()
+        } else {
+            apply(pending.info, artworkData: pending.artwork, accent: pending.accent, now: now, settled: true)
+        }
+    }
+
     private func snapshotOfCurrent(at now: Date) -> MediaSource? {
-        guard let info, info.hasContent, let id = resolvedBundleIdentifier else { return nil }
-        return MediaSource(id: id, name: appName ?? id, icon: appIcon, info: info, artwork: artwork, accent: accent, since: now)
+        guard let info, info.hasContent, let id = currentKey ?? resolvedBundleIdentifier else { return nil }
+        return MediaSource(id: id, name: id.contains("#") ? info.title : appName ?? id, icon: appIcon, info: info, artwork: artwork, accent: accent, since: now)
     }
 
     /// When another app takes over while the old one was playing, keep the old one as a source.
     private func trackOtherSources(previous: MediaSource?, now: Date) {
-        let current = resolvedBundleIdentifier
+        let current = currentKey
         otherSources.removeAll { $0.id == current }
         if let previous, previous.id != current, previous.info.isPlaying {
             otherSources.removeAll { $0.id == previous.id }
@@ -292,7 +368,7 @@ public final class NowPlayingService {
     /// Forgets sources whose app quit or whose track has run out.
     func pruneOtherSources(now: Date = Date()) {
         otherSources.removeAll { source in
-            if NSRunningApplication.runningApplications(withBundleIdentifier: source.id).isEmpty { return true }
+            if NSRunningApplication.runningApplications(withBundleIdentifier: source.bundleID).isEmpty { return true }
             if let duration = source.info.duration, let elapsed = source.info.elapsed(at: now) {
                 return elapsed >= duration
             }

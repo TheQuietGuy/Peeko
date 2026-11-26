@@ -14,7 +14,7 @@ public final class WeatherService {
         case unknownCity
         /// Offline, or Open-Meteo didn't answer; the last reading (if any) stays.
         case unavailable
-        /// "Use My Location" is on but Perch isn't allowed to know where the Mac is.
+        /// "Use My Location" is on but Peeko isn't allowed to know where the Mac is.
         case locationDenied
         /// macOS couldn't find the Mac's location right now.
         case locationUnavailable

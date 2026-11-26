@@ -16,14 +16,20 @@ enum NotchColor {
 }
 
 /// The Brutal theme's colours: flat, saturated, no gradients.
+/// Brutal, graphic rather than loud: black and white like a printed poster. A crisp white
+/// outline, a solid offset plate instead of a soft shadow, keys that press down. Colour comes
+/// only from what's happening: the action's own tint on its key, the song's colour on the plate.
 enum BrutalPalette {
-    /// Outline: lemon yellow, the loudest colour that still reads on black.
-    static let edge = Color(red: 1, green: 0.88, blue: 0.3)
-    /// The hard shadow: coral, so it reads against both the black body and a dark wallpaper.
-    static let shadow = Color(red: 1, green: 0.36, blue: 0.48)
-    static let edgeWidth: CGFloat = 2.5
-    /// How far the hard shadow sits down and right, before Small / Medium / Large.
-    static let shadowOffset: CGFloat = 6
+    /// Outline and lit keys: near-white, so it's sharp without glaring.
+    static let edge = Color(white: 0.96)
+    /// The offset plate: a pale grey that reads on any wallpaper without shouting.
+    static let shadow = Color(white: 1, opacity: 0.26)
+    /// A key's face: black, a touch lighter under the pointer.
+    static let key = Color.black
+    static let keyHover = Color(white: 0.11)
+    static let edgeWidth: CGFloat = 1.5
+    /// How far the plate sits down and right, before Small / Medium / Large.
+    static let shadowOffset: CGFloat = 5
 }
 
 private struct BrutalKey: EnvironmentKey {
@@ -85,6 +91,10 @@ enum Motion {
         }
         if let previous, isClosing(from: previous, to: presentation) {
             return .spring(response: style == .calm ? 0.42 : 0.38, dampingFraction: 1)
+        }
+        if theme == .glyph {
+            // Precise, like a display changing: quick, with only a hint of settle.
+            return .spring(response: style == .calm ? 0.38 : 0.32, dampingFraction: style == .springy ? 0.8 : 0.92)
         }
         if theme == .brutal {
             // Snaps open like a physical switch: quick and critically damped. Springy keeps a
@@ -216,6 +226,15 @@ extension AnyTransition {
         )
     }
 
+    /// Glyph's open view lights up left to right, like an LED display scanning in.
+    static var glyphOpenContent: AnyTransition {
+        .asymmetric(
+            insertion: .modifier(active: ScanIn(progress: 0), identity: ScanIn(progress: 1))
+                .animation(.easeOut(duration: 0.3).delay(0.05)),
+            removal: .opacity.animation(.easeIn(duration: 0.1))
+        )
+    }
+
     /// What sits beside the camera: it fades as soon as the shape starts opening, and comes back
     /// once a closing shape is nearly compact again.
     /// The second activity's symbol: in once its bubble has slid clear of the shape, and out
@@ -252,5 +271,118 @@ extension AnyTransition {
                 identity: BlurFade(blur: 0, scale: 1, opacity: 1)
             ).animation(.easeOut(duration: 0.1))
         )
+    }
+}
+
+
+// MARK: Glyph
+
+/// The Glyph theme: white dots on black, and one red.
+enum GlyphPalette {
+    /// A signal red, kept for what's urgent.
+    static let red = Color(red: 0.9, green: 0.15, blue: 0.16)
+    /// The unlit dots behind open content: there if you look, gone if you don't.
+    static let unlit = Color.white.opacity(0.075)
+    static let gridPitch: CGFloat = 6
+    static let gridDot: CGFloat = 1.5
+}
+
+private struct GlyphKey: EnvironmentKey {
+    static let defaultValue = false
+}
+
+extension EnvironmentValues {
+    /// True while the Glyph theme is on.
+    var glyph: Bool {
+        get { self[GlyphKey.self] }
+        set { self[GlyphKey.self] = newValue }
+    }
+}
+
+/// A grid of round dots. Drawn once per size, so keep its frame fixed while things move.
+struct DotGrid: View {
+    var pitch: CGFloat
+    var dot: CGFloat
+    var color: Color = .white
+
+    var body: some View {
+        Canvas { context, size in
+            var path = Path()
+            var y = pitch / 2
+            while y < size.height {
+                var x = pitch / 2
+                while x < size.width {
+                    path.addEllipse(in: CGRect(x: x - dot / 2, y: y - dot / 2, width: dot, height: dot))
+                    x += pitch
+                }
+                y += pitch
+            }
+            context.fill(path, with: .color(color))
+        }
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+}
+
+extension View {
+    /// In Glyph, draws this out of LED dots like a dot-matrix display. For bars and big type only:
+    /// small text made of dots can't be read.
+    func glyphDots(pitch: CGFloat = 2.4) -> some View {
+        modifier(GlyphDots(pitch: pitch))
+    }
+
+    /// A big number (a timer, a temperature, days left). In Glyph it turns heavy, monospaced and
+    /// made of dots, because a thin line of dots disappears.
+    func numeral(size: CGFloat, weight: Font.Weight, design: Font.Design = .default) -> some View {
+        modifier(Numeral(size: size, weight: weight, design: design))
+    }
+}
+
+private struct GlyphDots: ViewModifier {
+    let pitch: CGFloat
+    @Environment(\.glyph) private var glyph
+
+    func body(content: Content) -> some View {
+        if glyph {
+            content.mask(DotGrid(pitch: pitch, dot: pitch * 0.8))
+        } else {
+            content
+        }
+    }
+}
+
+private struct Numeral: ViewModifier {
+    let size: CGFloat
+    let weight: Font.Weight
+    let design: Font.Design
+    @Environment(\.glyph) private var glyph
+
+    func body(content: Content) -> some View {
+        content
+            .monospacedDigit()
+            .font(glyph ? .system(size: size, weight: .heavy, design: .monospaced) : .system(size: size, weight: weight, design: design))
+            .glyphDots(pitch: max(2, (size / 13).rounded(.toNearestOrAwayFromZero)))
+    }
+}
+
+/// Reveals content from the leading edge, with a short soft front like a scan line.
+private struct ScanIn: ViewModifier, Animatable {
+    var progress: Double
+    nonisolated var animatableData: Double {
+        get { progress }
+        set { progress = newValue }
+    }
+
+    func body(content: Content) -> some View {
+        content.mask {
+            LinearGradient(
+                stops: [
+                    .init(color: .black, location: 0),
+                    .init(color: .black, location: max(0, progress * 1.15 - 0.15)),
+                    .init(color: .clear, location: min(1, progress * 1.15)),
+                ],
+                startPoint: .leading, endPoint: .trailing
+            )
+        }
     }
 }

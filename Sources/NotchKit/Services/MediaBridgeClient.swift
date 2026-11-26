@@ -77,6 +77,7 @@ final class MediaBridgeClient {
     nonisolated static func unquarantinedCopy(of library: URL, in folder: URL? = nil, fileManager: FileManager = .default) -> URL? {
         guard
             let folder = folder ?? fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first?
+                // The folder keeps the app's earlier name (Perch), so nothing already there is lost.
                 .appendingPathComponent("Perch", isDirectory: true),
             let bytes = try? Data(contentsOf: library)
         else { return nil }

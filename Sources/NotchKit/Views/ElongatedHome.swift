@@ -491,7 +491,7 @@ private struct TimerWidget: View {
             HStack(spacing: 12 * s) {
                 Button { model.expand(.activity(.timer)) } label: {
                     CountdownText(timer: timer)
-                        .font(.system(size: 34 * s, weight: .light))
+                        .numeral(size: 34 * s, weight: .light)
                         .monospacedDigit()
                         .foregroundStyle(timer.isPaused ? NotchColor.secondaryText : .white)
                         .frame(maxWidth: .infinity, alignment: .leading)

@@ -30,7 +30,7 @@ public enum AgentHookClient {
 
     /// Authenticate the connected process, not the replaceable socket pathname. The app must
     /// meet this copy's designated requirement: for a release, any build signed with the
-    /// Perch certificate under the same app ID, so approvals keep working when the app
+    /// same certificate under the same app ID, so approvals keep working when the app
     /// on disk is updated before the running one restarts. An ad-hoc test build's requirement
     /// is its exact code hash. Audit tokens avoid PID reuse.
     static func trustsPeer(_ fd: Int32) -> Bool {

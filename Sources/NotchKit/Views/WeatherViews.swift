@@ -82,7 +82,7 @@ private struct WeatherCityPrompt: View {
     private var title: LocalizedStringKey {
         switch status {
         case .unknownCity: "Couldn't find that city. Try another?"
-        case .locationDenied: "Perch isn't allowed to use your location."
+        case .locationDenied: "Peeko isn't allowed to use your location."
         default: "Where should Weather be for?"
         }
     }
@@ -119,20 +119,28 @@ struct WeatherForecastView: View {
     let updatedAt: Date?
     var isCurrentLocation = false
     var changeCity: () -> Void = {}
+    /// The day picked in the week below; its hours and details show above. Today by default.
+    @State private var picked: Date?
     @Environment(\.notchScale) private var s
 
     var body: some View {
+        let day = forecast.days.first { $0.date == picked } ?? forecast.today
         VStack(alignment: .leading, spacing: 8 * s) {
             HStack(alignment: .top, spacing: 12 * s) {
                 WeatherNowBlock(forecast: forecast, status: status, updatedAt: updatedAt, isCurrentLocation: isCurrentLocation, changeCity: changeCity)
                     .frame(width: 168 * s, alignment: .leading)
                 VStack(alignment: .leading, spacing: 6 * s) {
-                    WeatherHours(hours: Array(forecast.hours.prefix(8)), zone: forecast.timeZone)
-                    WeatherDetails(forecast: forecast)
+                    WeatherHours(hours: day.map(forecast.hours(for:)) ?? Array(forecast.hours.prefix(8)), zone: forecast.timeZone, startsNow: day == forecast.today)
+                        .id(day?.date)
+                        .transition(.opacity.combined(with: .move(edge: .trailing)))
+                    WeatherDetails(forecast: forecast, day: day)
                 }
+                .animation(.smooth(duration: 0.3), value: picked)
             }
             .frame(height: 112 * s)
-            WeatherWeek(forecast: forecast)
+            WeatherWeek(forecast: forecast, picked: day?.date) { date in
+                picked = date == forecast.today?.date ? nil : date
+            }
         }
     }
 }
@@ -161,7 +169,7 @@ private struct WeatherNowBlock: View {
             .help("Change city")
             HStack(alignment: .center, spacing: 6 * s) {
                 Text(now.temperatureLabel)
-                    .font(.system(size: 44 * s, weight: .light, design: .rounded))
+                    .numeral(size: 44 * s, weight: .light, design: .rounded)
                     .monospacedDigit()
                     .foregroundStyle(.white)
                     .contentTransition(.numericText())
@@ -178,6 +186,11 @@ private struct WeatherNowBlock: View {
                     .monospacedDigit()
                     .foregroundStyle(NotchColor.secondaryText)
             }
+            if let rain = forecast.rainAlert {
+                Label(WeatherText.rainAlert(rain, zone: forecast.timeZone), systemImage: "umbrella.fill")
+                    .font(.system(size: 10.5 * s, weight: .semibold))
+                    .foregroundStyle(WeatherText.rainBlue)
+            }
             if status == .unavailable, let updatedAt {
                 Text("Offline · from \(updatedAt.formatted(date: .omitted, time: .shortened))")
                     .font(.system(size: 9.5 * s, weight: .medium))
@@ -192,15 +205,16 @@ private struct WeatherNowBlock: View {
 private struct WeatherHours: View {
     let hours: [WeatherForecast.Hour]
     let zone: TimeZone
+    var startsNow = true
     @Environment(\.notchScale) private var s
 
     var body: some View {
         HStack(spacing: 0) {
             ForEach(Array(hours.enumerated()), id: \.element.id) { index, hour in
                 VStack(spacing: 4 * s) {
-                    Text(index == 0 ? "Now" : WeatherText.hour(hour.time, zone: zone))
+                    Text(index == 0 && startsNow ? "Now" : WeatherText.hour(hour.time, zone: zone))
                         .font(.system(size: 10 * s, weight: .semibold))
-                        .foregroundStyle(index == 0 ? .white : NotchColor.secondaryText)
+                        .foregroundStyle(index == 0 && startsNow ? .white : NotchColor.secondaryText)
                     Image(systemName: hour.symbolName)
                         .symbolRenderingMode(.multicolor)
                         .font(.system(size: 15 * s))
@@ -211,7 +225,7 @@ private struct WeatherHours: View {
                         .foregroundStyle(.white)
                     Text(WeatherText.rain(hour.rainChance))
                         .font(.system(size: 9 * s, weight: .semibold))
-                        .foregroundStyle(Color(red: 0.4, green: 0.75, blue: 1))
+                        .foregroundStyle(WeatherText.rainBlue)
                         .frame(height: 10 * s)
                 }
                 .frame(maxWidth: .infinity)
@@ -223,19 +237,26 @@ private struct WeatherHours: View {
     }
 }
 
+/// Today: how it feels now. Another day: its rain, UV and daylight.
 private struct WeatherDetails: View {
     let forecast: WeatherForecast
+    let day: WeatherForecast.Day?
     @Environment(\.notchScale) private var s
 
     var body: some View {
+        let zone = forecast.timeZone
         HStack(spacing: 10 * s) {
-            if let rain = forecast.rainAlert {
-                detail("umbrella.fill", WeatherText.rainAlert(rain, zone: forecast.timeZone), tint: Color(red: 0.4, green: 0.75, blue: 1))
+            if day == forecast.today {
+                if let feels = forecast.feelsLike { detail("thermometer.medium", "Feels \(Int(feels.rounded()))°") }
+                if let humidity = forecast.humidity { detail("humidity.fill", "\(humidity)%") }
+                if let wind = forecast.wind { detail("wind", WeatherText.wind(wind)) }
+                if let uv = forecast.uv { detail("sun.max.fill", WeatherText.uv(uv)) }
+            } else if let day {
+                if let rain = day.rainChance { detail("umbrella.fill", "\(rain)%", tint: rain >= 50 ? WeatherText.rainBlue : NotchColor.secondaryText) }
+                if let uv = day.uv { detail("sun.max.fill", WeatherText.uv(uv)) }
+                if let sunrise = day.sunrise { detail("sunrise.fill", WeatherText.hour(sunrise, zone: zone, minutes: true)) }
             }
-            if let feels = forecast.feelsLike { detail("thermometer.medium", "Feels \(Int(feels.rounded()))°") }
-            if let humidity = forecast.humidity { detail("humidity.fill", "\(humidity)%") }
-            if let wind = forecast.wind { detail("wind", WeatherText.wind(wind)) }
-            if let sunset = forecast.today?.sunset { detail("sunset.fill", WeatherText.hour(sunset, zone: forecast.timeZone, minutes: true)) }
+            if let sunset = day?.sunset { detail("sunset.fill", WeatherText.hour(sunset, zone: zone, minutes: true)) }
         }
         .lineLimit(1)
         .minimumScaleFactor(0.8)
@@ -253,15 +274,18 @@ private struct WeatherDetails: View {
 /// turned on its side.
 private struct WeatherWeek: View {
     let forecast: WeatherForecast
+    let picked: Date?
+    let pick: (Date) -> Void
     @Environment(\.notchScale) private var s
 
     var body: some View {
         HStack(spacing: 6 * s) {
             ForEach(Array(forecast.days.prefix(7).enumerated()), id: \.element.id) { index, day in
-                VStack(spacing: 3 * s) {
+                let isPicked = day.date == picked
+                Button { pick(day.date) } label: { VStack(spacing: 3 * s) {
                     Text(index == 0 ? "Today" : WeatherText.weekday(day.date, zone: forecast.timeZone))
                         .font(.system(size: 10 * s, weight: .semibold))
-                        .foregroundStyle(index == 0 ? .white : NotchColor.secondaryText)
+                        .foregroundStyle(isPicked ? .white : NotchColor.secondaryText)
                     Image(systemName: day.symbolName)
                         .symbolRenderingMode(.multicolor)
                         .font(.system(size: 14 * s))
@@ -278,8 +302,13 @@ private struct WeatherWeek: View {
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 6 * s)
-                .background(RoundedRectangle(cornerRadius: 10 * s, style: .continuous).fill(Color.white.opacity(index == 0 ? 0.1 : 0.05)))
+                .background(RoundedRectangle(cornerRadius: 10 * s, style: .continuous).fill(Color.white.opacity(isPicked ? 0.16 : 0.05)))
+                .contentShape(Rectangle())
+                }
+                .buttonStyle(PressableButtonStyle())
                 .accessibilityElement(children: .combine)
+                .accessibilityAddTraits(isPicked ? .isSelected : [])
+                .help("Show \(index == 0 ? "today" : WeatherText.weekday(day.date, zone: forecast.timeZone))")
             }
         }
     }
@@ -325,7 +354,7 @@ struct WeatherHomeSection: View {
                 if let forecast = model.weather.forecast {
                     HStack(spacing: 6 * s) {
                         Text(forecast.now.temperatureLabel)
-                            .font(.system(size: 26 * s, weight: .light, design: .rounded))
+                            .numeral(size: 26 * s, weight: .light, design: .rounded)
                             .monospacedDigit()
                             .foregroundStyle(.white)
                         Image(systemName: forecast.now.symbolName)
@@ -377,8 +406,25 @@ enum WeatherText {
         return "\((chance + 5) / 10 * 10)%"
     }
 
-    static func rainAlert(_ hour: WeatherForecast.Hour, zone: TimeZone) -> String {
-        String(localized: "Rain at \(Self.hour(hour.time, zone: zone))")
+    static let rainBlue = Color(red: 0.4, green: 0.75, blue: 1)
+
+    /// "UV 6 High", using the WHO's bands.
+    static func uv(_ index: Double) -> String {
+        let value = Int(index.rounded())
+        let band = switch value {
+        case ..<3: String(localized: "Low")
+        case 3..<6: String(localized: "Moderate")
+        case 6..<8: String(localized: "High")
+        case 8..<11: String(localized: "Very high")
+        default: String(localized: "Extreme")
+        }
+        return "UV \(value) \(band)"
+    }
+
+    static func rainAlert(_ hour: WeatherForecast.Hour, zone: TimeZone, now: Date = Date()) -> String {
+        // The hour already under way: "at 1 pm" at 1:20 reads like a mistake.
+        if hour.time <= now { return String(localized: "Rain likely now") }
+        return String(localized: "Rain at \(Self.hour(hour.time, zone: zone))")
     }
 
     static func wind(_ speed: Double, locale: Locale = .current) -> String {

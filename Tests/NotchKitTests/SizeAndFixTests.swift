@@ -216,6 +216,7 @@ struct NowPlayingStateTests {
         #expect(service.artwork != nil, "same track keeps its art")
         info.title = "Next"
         info.artworkKey = nil
+        info.elapsed = 0  // a new song starts from the top (a mid-song title is another tab)
         service.apply(info, artworkData: nil)
         #expect(service.artwork == nil, "new track without art clears the old art")
         #expect(service.accent == .white)

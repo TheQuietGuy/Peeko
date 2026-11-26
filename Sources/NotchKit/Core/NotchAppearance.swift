@@ -35,9 +35,14 @@ public enum NotchTheme: String, CaseIterable, Sendable, Codable, Identifiable {
     /// Frosted glass that shows a blur of what's behind it, with softer, springier motion. The
     /// part around the camera stays black so the notch itself doesn't show through.
     case glass
-    /// Neo-brutalist: the black body gains a thick lemon outline and a hard coral shadow with no
-    /// blur once it opens, and moves without bounce. The resting notch stays plain black.
+    /// Neo-brutalist, graphic rather than loud: once it opens the black body gains a crisp white
+    /// outline and a solid offset plate instead of a soft shadow, and moves without bounce. The
+    /// resting notch stays plain black.
     case brutal
+    /// "Dot Matrix" in Settings. Monochrome, after LED dot-matrix displays: pure black, a faint
+    /// grid of unlit dots once it opens, big numbers and the music bars drawn in lit dots, and
+    /// red kept for what's urgent. Crisp motion with only a hint of settle.
+    case glyph
 
     public var id: String { rawValue }
 }

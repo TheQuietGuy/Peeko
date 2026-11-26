@@ -85,7 +85,8 @@ struct AudioSpectrumTests {
         let plain = engine.layout(for: music, home: HomeContent(), hovering: false).pill
         let sung = engine.layout(for: music, home: HomeContent(hasLyrics: true), hovering: false).pill
         #expect(sung.height == plain.height + (IslandMetrics.compactLyrics * engine.scale).rounded())
-        #expect(sung.width == plain.width, "same width, so the camera stays centred between art and bars")
+        #expect(sung.width == plain.width + 2 * (IslandMetrics.compactLyricsEar * engine.scale).rounded(), "wider for the words")
+        #expect(sung.midX == plain.midX, "still centred on the camera")
         let timer = IslandPresentation.compact(primary: .timer, secondary: nil)
         #expect(engine.layout(for: timer, home: HomeContent(hasLyrics: true), hovering: false).pill.height
             == engine.layout(for: timer, home: HomeContent(), hovering: false).pill.height)
@@ -105,5 +106,15 @@ struct AudioSpectrumTests {
         #expect(starts == [now.addingTimeInterval(2), now.addingTimeInterval(6)])
         #expect(lyrics.upcomingStarts(after: 3, rate: 2, now: now).first == now.addingTimeInterval(1), "faster playback, sooner")
         #expect(lyrics.upcomingStarts(after: 10, rate: 1, now: now).isEmpty)
+    }
+
+    @Test func longLyricLinesGlideOncePartwayThrough() throws {
+        #expect(abs(LyricsScroll.delay(lineSeconds: 5) - 2.025) < 1e-9, "a little under half the line")
+        #expect(LyricsScroll.delay(lineSeconds: 1) == 0.7, "never before the start can be read")
+        #expect(LyricsScroll.delay(lineSeconds: 30) == 4, "a long held note doesn't hide the end for long")
+        let lyrics = try #require(SyncedLyrics(lrc: "[00:01.00]one\n[00:04.50]two"))
+        #expect(lyrics.duration(of: 0) == 3.5)
+        #expect(lyrics.duration(of: 1) == 4)
+        #expect(lyrics.duration(of: 9) == 0)
     }
 }

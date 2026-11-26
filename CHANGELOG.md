@@ -5,6 +5,55 @@ Every release of Dynamic Ledge (called Dynamic Notch until 1.4.0), newest first.
 [Semantic Versioning](https://semver.org/): new features bump the middle number, fixes bump the
 last one.
 
+## [2.6.0] - 2026-11-26
+
+**Perch is now Peeko.** Another Mac notch app is already called Perch, so this one has a name
+of its own: Pip still peeks out beside the camera. Settings, permissions and saved files carry
+over (the app's identity underneath is unchanged).
+
+### Added
+- **Dot Matrix theme.** Inspired by LED displays: pure black with a faint grid of unlit
+  dots once the notch opens, the music bars as columns of lit dots, big numbers (timers,
+  temperature, days left) drawn in dots, open views scanning in from the left, and precise
+  motion with only a hint of settle. At rest it's still just the notch.
+- Between lyric lines (and before the first), the lyrics strip shows the song and artist.
+- Home widgets can be reordered by dragging in Settings › Home Page.
+- **Weather works like a weather app.** Click a day in the week to see its hours (every three
+  hours) and its rain chance, UV and sunrise and sunset; today shows how it feels now, with
+  humidity, wind and the UV index. The rain alert moved under the temperature, where it fits.
+
+### Performance
+- A long lyric line now glides once to show its end, instead of crawling for the whole line,
+  which kept SwiftUI redrawing the notch every frame. While music played with lyrics the main
+  thread went from about half busy to about a fifth.
+
+### Changed
+- **Brutal, reworked.** Graphic rather than loud: black and white like a printed poster, with a
+  crisp white outline, a solid offset plate instead of the coral shadow, and black keys with
+  white edges whose labels carry the action's colour. The song's colour still fills the plate.
+- **Several tabs or apps playing.** When two play at once, macOS reports whichever spoke last,
+  so the notch used to flip between them. A different source now waits a moment before taking
+  over; if the one showing keeps playing, the other goes in the switcher (a second tab of the
+  same browser is named by what it plays) instead of the view jumping.
+- Keep Awake turns itself off when the battery runs low on its own power.
+- On a screen without a notch, Perch now floats as a pill by default, instead of drawing a
+  notch that isn't there.
+- Updates are checked against Perch's own GitHub releases (TheQuietGuy/Perch), never the
+  original app's, and open the release to download.
+
+### Removed
+- The anonymous daily usage signal, which had nowhere to go in Perch.
+
+## [2.5.1] - 2026-11-25
+
+### Fixed
+- **Long lyric lines were cut off.** The lyrics strip is a little wider, and a line that still
+  doesn't fit slides left while it's sung, finishing about a second before the next line, with
+  soft edges instead of "…".
+- **A pause when opening the notch.** Perch looked for a camera every time Home opened, which
+  walks every capture device on the main thread. It now looks once, when Mirror first opens.
+- The AI usage refresh timer can now be coalesced with others by macOS.
+
 ## [2.5.0] - 2026-11-23
 
 ### Added

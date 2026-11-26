@@ -174,9 +174,6 @@ public final class SettingsStore {
     public var checksForUpdates: Bool { didSet { defaults.set(checksForUpdates, forKey: Key.checksForUpdates) } }
     /// Automatically install verified updates found during background checks.
     public var installsUpdatesAutomatically: Bool { didSet { defaults.set(installsUpdatesAutomatically, forKey: Key.installsUpdatesAutomatically) } }
-    /// Send one anonymous signal a day, so the developer can count how many Macs use the app. Not
-    /// shown in Settings (it carries no personal data); `defaults write` can turn it off.
-    public var sharesUsage: Bool { didSet { defaults.set(sharesUsage, forKey: Key.sharesUsage) } }
     /// Show Codex's and Antigravity's usage limits, read on this Mac. Off until turned on.
     public var aiUsageEnabled: Bool { didSet { defaults.set(aiUsageEnabled, forKey: Key.aiUsageEnabled) } }
     /// The launcher tile's switch: while on, usage is checked and the lowest limit left shows
@@ -316,7 +313,6 @@ public final class SettingsStore {
         // Off in this fork: the feed is the original app's, and an update would replace these changes.
         checksForUpdates = defaults.object(forKey: Key.checksForUpdates) as? Bool ?? false
         installsUpdatesAutomatically = defaults.object(forKey: Key.installsUpdatesAutomatically) as? Bool ?? false
-        sharesUsage = defaults.object(forKey: Key.sharesUsage) as? Bool ?? true
         agentFinishedAlerts = defaults.object(forKey: Key.agentFinishedAlerts) as? Bool ?? true
         agentWatchesTranscript = defaults.object(forKey: Key.agentWatchesTranscript) as? Bool ?? true
         aiUsageEnabled = defaults.object(forKey: Key.aiUsageEnabled) as? Bool ?? false
@@ -402,12 +398,14 @@ public final class SettingsStore {
         appearance = Self.perchDefaults
     }
 
-    /// Perch's own look: the black Dynamic Island Mac users know, with Pip on. Brutal and Glass
+    /// Peeko's own look: the black Dynamic Island Mac users know, with Pip on. Brutal and Glass
     /// are one click away in Settings › Appearance. `NotchAppearance.standard` stays the
     /// original look so the layout engine's defaults (and their tests) don't change.
     public static var perchDefaults: NotchAppearance {
         var look = NotchAppearance.standard
         look.companion = true
+        // A drawn notch on a screen that has none looks like a mistake; a floating pill doesn't.
+        look.externalStyle = .pill
         return look
     }
 
@@ -471,7 +469,6 @@ public final class SettingsStore {
         static let keyboardShortcuts = "general.keyboardShortcuts"
         static let checksForUpdates = "general.checksForUpdates"
         static let installsUpdatesAutomatically = "general.installsUpdatesAutomatically"
-        static let sharesUsage = "general.sharesUsage"
         static let agentFinishedAlerts = "agents.finishedAlerts"
         static let agentWatchesTranscript = "agents.watchesTranscript"
         static let aiUsageEnabled = "aiUsage.enabled"

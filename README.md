@@ -1,23 +1,25 @@
 <p align="center">
-  <img src="Support/AppIcon-1024.png" width="160" alt="Perch icon: a lemon tile with a notch, two eyes and a smile">
+  <img src="Support/AppIcon-1024.png" width="160" alt="Peeko icon: a lemon tile with a notch, two eyes and a smile">
 </p>
 
-<h1 align="center">Perch</h1>
+<h1 align="center">Peeko</h1>
 
 <p align="center">
-  A small friend that lives on your MacBook's notch.
+  The free, open-source notch for your Mac, with a small friend called Pip.
 </p>
+
+<p align="center"><sub>Formerly called Perch.</sub></p>
 
 ---
 
-Perch turns the notch into a face. When nothing's happening, **Pip** sits either side of the
+Peeko turns the notch into a face. When nothing's happening, **Pip** sits either side of the
 camera: two eyes that blink, follow your pointer, widen when you hover, smile when something
 finishes and fall asleep at night. When something *is* happening (music, a timer, a call, a
-coding assistant asking for permission) the notch stretches out and shows it, in a loud,
-honest **Brutal** look: thick lemon edges, hard coral shadows, buttons that press like keys.
+coding assistant asking for permission) the notch stretches out and shows it: in black like
+the iPhone's Dynamic Island, or in one of three other looks (Glass, Brutal, Dot Matrix).
 
-Perch is a fork of [Dynamic Ledge](https://github.com/shandilyaswagat/dynamic_ledge) by Swagat
-Shandilya and Pritam Biswas, and keeps everything it does. New in Perch:
+Peeko is a fork of [Dynamic Ledge](https://github.com/shandilyaswagat/dynamic_ledge) by Swagat
+Shandilya and Pritam Biswas, and keeps everything it does. New in Peeko:
 
 - **Pip**, the notch companion (Settings › Appearance › Pip on the notch)
 - **Customisable Home**: pick and order its widgets
@@ -26,7 +28,8 @@ Shandilya and Pritam Biswas, and keeps everything it does. New in Perch:
 - **The song colours the notch**: a glow on Black, tinted Liquid Glass, Brutal's hard shadow
 - **Colour Picker** (⌃⌥X): pick any colour on screen, copy it as HEX, RGB, HSL or SwiftUI
 - **Countdowns** (⌃⌥Y): days left to exams, deadlines and trips
-- **Brutal** theme, a loud alternative to the black Dynamic Island look
+- **Brutal** theme: graphic, like a printed poster: a crisp white outline, a solid offset plate, keys that press down
+- **Dot Matrix** theme: an LED-display look with lit-dot music bars and big numbers, a faint dot grid and a scan-in when it opens
 - **Stats** as its own tab beside Home: CPU per core, GPU, memory breakdown, battery health and power, network with history, the busiest apps
 - **Clipboard** keeps 20, 50 or 100 copies
 - **Headphone battery** when AirPods connect (Settings › Activities & Alerts)
@@ -36,7 +39,7 @@ Shandilya and Pritam Biswas, and keeps everything it does. New in Perch:
 **Build it** (needs Xcode 16 or newer, opened once to accept its licence):
 
 ```bash
-BUNDLE_ID=com.sarhan.Perch Scripts/build-app.sh   # → build/Perch.app
+BUNDLE_ID=com.sarhan.Perch Scripts/build-app.sh   # → build/Peeko.app
 ```
 
 ## What it does
@@ -70,9 +73,9 @@ You need a Mac with macOS 14 (Sonoma) or newer and **Xcode 16 or newer** (free o
 1. Open Xcode once and click **Agree** on the licence (or run `sudo xcodebuild -license accept`).
 2. Get the code and build:
    ```bash
-   git clone <this repo> Perch && cd Perch
-   BUNDLE_ID=com.sarhan.Perch APP_OUTPUT="/Applications/Perch.app" Scripts/build-app.sh
-   open /Applications/Perch.app
+   git clone <this repo> Peeko && cd Peeko
+   BUNDLE_ID=com.sarhan.Perch APP_OUTPUT="/Applications/Peeko.app" Scripts/build-app.sh
+   open /Applications/Peeko.app
    ```
 3. Pip appears either side of the camera and an eyes icon appears in the menu bar.
 4. Click the eyes icon › **Settings…** and turn on **Open at login** (General).
@@ -99,17 +102,17 @@ notch to peek, or click it.
 
 ## Update it
 
-Pull the latest code and run the build again. Perch never downloads updates by itself.
+Pull the latest code and run the build again. Peeko never downloads updates by itself.
 
 ## Remove it
 
 1. If you turned on any coding assistants, switch them off in **Settings › General › Coding Assistants**
    first.
-   That removes what Perch added to their settings files.
-2. Click the capsule icon in the menu bar and choose **Quit Perch**.
-3. Drag **Perch** from Applications to the Trash.
+   That removes what Peeko added to their settings files.
+2. Click the capsule icon in the menu bar and choose **Quit Peeko**.
+3. Drag **Peeko** from Applications to the Trash.
 4. To clear everything it saved too, delete these:
-   - `~/Library/Application Support/Perch`
+   - `~/Library/Application Support/Peeko`
    - `~/Library/Preferences/com.sarhan.Perch.plist`
 
 
@@ -149,7 +152,7 @@ everything else keeps working.
   you quit, except pinned items.
 - **Notes and settings:** saved on your Mac only.
 
-**Coding assistants** are off until you switch one on. Then Perch adds a small hook to
+**Coding assistants** are off until you switch one on. Then Peeko adds a small hook to
 that tool's own settings file (like `~/.claude/settings.json`) so it can ask you in the notch.
 Requests stay on your Mac. Switch it off and the hook is removed.
 
@@ -158,7 +161,7 @@ limits you've used, with the lowest limit left beside the camera when nothing el
 launcher tile switches that and the checks off and on, like Stats. It asks the Codex app on your Mac, which checks with OpenAI using your own
 Codex sign-in. For Antigravity it reads its files in `~/.gemini` and asks the Antigravity app
 running on your Mac, using the local key Antigravity hands its own background service; that
-request never leaves your Mac. Perch never stores your passwords, tokens or API keys,
+request never leaves your Mac. Peeko never stores your passwords, tokens or API keys,
 and sends nothing online itself.
 
 **Music and Stats** are read from macOS on your Mac. Nothing is sent anywhere.

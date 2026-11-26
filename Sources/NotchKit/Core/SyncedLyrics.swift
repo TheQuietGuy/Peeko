@@ -31,6 +31,12 @@ public struct SyncedLyrics: Equatable, Sendable {
     }
 
     /// The line being sung at `elapsed`, or nil before the first one.
+    /// How long a line is sung for: until the next one starts, or 4 s for the last.
+    public func duration(of index: Int) -> TimeInterval {
+        guard lines.indices.contains(index) else { return 0 }
+        return index + 1 < lines.count ? lines[index + 1].time - lines[index].time : 4
+    }
+
     /// When each line still to come starts on the clock, for a song at `elapsed` seconds now.
     /// Lyrics redraw only at these moments instead of polling.
     public func upcomingStarts(after elapsed: TimeInterval, rate: Double, now: Date) -> [Date] {

@@ -50,6 +50,7 @@ public final class AIUsageService {
                 self?.refreshAll(userInitiated: false)
             }
         }
+        timer?.tolerance = 15
     }
 
     public func stopAutomaticRefreshes() {

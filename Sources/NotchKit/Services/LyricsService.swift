@@ -95,7 +95,7 @@ public final class LyricsService {
     nonisolated private static func request<Value: Decodable>(_ url: URL, as type: Value.Type, session: URLSession) async -> Response<Value> {
         var request = URLRequest(url: url, timeoutInterval: 10)
         // LRCLIB asks apps to say who they are.
-        request.setValue("Perch (https://github.com/shandilyaswagat/dynamic_ledge)", forHTTPHeaderField: "User-Agent")
+        request.setValue("Peeko (https://github.com/TheQuietGuy/Peeko)", forHTTPHeaderField: "User-Agent")
         guard let (data, response) = try? await session.data(for: request),
               let status = (response as? HTTPURLResponse)?.statusCode else { return .failed }
         if status == 404 { return .notFound }

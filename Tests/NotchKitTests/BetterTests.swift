@@ -404,4 +404,18 @@ struct AutomationRulesTests {
         #expect(AutomationRules.message(for: -600, appName: "Pages") == "Pages isn't running any more.")
         #expect(AutomationRules.message(for: -50, appName: "Pages")?.contains("-50") == true)
     }
+
+    @MainActor @Test func glyphTheme() throws {
+        let defaults = UserDefaults(suiteName: "glyph-\(UUID().uuidString)")!
+        let settings = SettingsStore(defaults: defaults)
+        settings.appearance.pitchBlack = true
+        settings.appearance.theme = .glyph
+        #expect(SettingsStore(defaults: defaults).appearance.theme == .glyph)
+        // Pitch black is a Black setting: it mustn't hide Glyph's grid, which needs the open edge.
+        let engine = LayoutEngine(screen: .sample, appearance: settings.appearance)
+        #expect(engine.layout(for: .nook(.home), home: HomeContent(), hovering: false).brutalEdge > 0.99)
+        #expect(engine.layout(for: .idle, home: HomeContent(), hovering: false).brutalEdge == 0, "at rest it's just the notch")
+        #expect(Motion.shape(to: .nook(.home), reduceMotion: false, theme: .glyph) == .spring(response: 0.32, dampingFraction: 0.92))
+        #expect(Motion.shape(to: .nook(.home), reduceMotion: true, theme: .glyph) == .easeInOut(duration: 0.2))
+    }
 }

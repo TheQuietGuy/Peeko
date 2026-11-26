@@ -64,7 +64,10 @@ public struct ReleaseInfo: Equatable, Sendable {
                 .flatMap(URL.init(string:))
                 .flatMap { isAllowedGitHubURL($0, forAsset: true) ? $0 : nil }
         }
-        guard let image = asset(diskImageName) else { return nil }
+        // Peeko's releases carry the app as a .dmg or a "-macOS.zip"; the old name still works.
+        let download = assets.first { ($0["name"] as? String).map { $0.hasSuffix(".dmg") || $0.hasSuffix("-macOS.zip") } == true }
+            .flatMap { $0["name"] as? String }
+        guard let image = asset(diskImageName) ?? download.flatMap(asset) else { return nil }
         return ReleaseInfo(version: version, diskImage: image, checksum: asset(diskImageName + ".sha256"), signedManifest: asset("DynamicNotch.update.json"), page: page)
     }
 }

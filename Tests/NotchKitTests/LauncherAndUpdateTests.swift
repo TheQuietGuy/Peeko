@@ -234,6 +234,7 @@ struct LauncherModelTests {
     }
 }
 
+@MainActor
 @Suite("Renaming to Dynamic Ledge")
 struct AppRenameTests {
     private func folder() throws -> URL {
@@ -258,5 +259,14 @@ struct AppRenameTests {
         let old = apps.appendingPathComponent("Dynamic Notch.app")
         try FileManager.default.createDirectory(at: apps.appendingPathComponent("Dynamic Ledge.app"), withIntermediateDirectories: true)
         #expect(AppRename.destination(for: old) == nil, "never over another copy")
+    }
+
+    @Test func perchReleasesWithAZippedAppAreFound() throws {
+        let json = #"{"tag_name":"v2.6.0","html_url":"https://github.com/TheQuietGuy/Peeko/releases/tag/v2.6.0","assets":[{"name":"Peeko-2.6.0-macOS.zip","browser_download_url":"https://github.com/TheQuietGuy/Peeko/releases/download/v2.6.0/Peeko-2.6.0-macOS.zip"}]}"#
+        let release = try #require(ReleaseInfo.parse(Data(json.utf8)))
+        #expect(release.version == SemanticVersion("2.6.0"))
+        #expect(release.diskImage.lastPathComponent == "Peeko-2.6.0-macOS.zip")
+        #expect(release.signedManifest == nil, "no signing key, so it's a download, never a silent install")
+        #expect(Updater.latestRelease.path.contains("TheQuietGuy/Peeko"))
     }
 }

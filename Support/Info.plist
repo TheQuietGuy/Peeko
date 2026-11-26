@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
-	<string>Perch</string>
+	<string>Peeko</string>
 	<key>CFBundleExecutable</key>
 	<string>DynamicNotch</string>
 	<key>CFBundleIconFile</key>
@@ -15,7 +15,7 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>Perch</string>
+	<string>Peeko</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -33,13 +33,13 @@
 	<key>NSHighResolutionCapable</key>
 	<true/>
 	<key>NSCalendarsFullAccessUsageDescription</key>
-	<string>Perch shows your next event in the notch and gives you a heads-up before it starts.</string>
+	<string>Peeko shows your next event in the notch and gives you a heads-up before it starts.</string>
 	<key>NSCalendarsUsageDescription</key>
-	<string>Perch shows your next event in the notch and gives you a heads-up before it starts.</string>
+	<string>Peeko shows your next event in the notch and gives you a heads-up before it starts.</string>
 	<key>NSRemindersFullAccessUsageDescription</key>
-	<string>Perch shows today's to-dos in the notch so you can tick them off.</string>
+	<string>Peeko shows today's to-dos in the notch so you can tick them off.</string>
 	<key>NSRemindersUsageDescription</key>
-	<string>Perch shows today's to-dos in the notch so you can tick them off.</string>
+	<string>Peeko shows today's to-dos in the notch so you can tick them off.</string>
 	<key>NSLocationUsageDescription</key>
 	<string>Weather shows the forecast for where you are. Your location is only used to ask Open-Meteo for that forecast.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
@@ -49,9 +49,9 @@
 	<key>NSAudioCaptureUsageDescription</key>
 	<string>Live music bars measure how loud your Mac's sound is so the bars move with the music. Nothing is recorded, saved or sent.</string>
 	<key>NSAppleEventsUsageDescription</key>
-	<string>Perch reads the saved document or web address of the window you drop into Tray.</string>
+	<string>Peeko reads the saved document or web address of the window you drop into Tray.</string>
 	<key>NSHumanReadableCopyright</key>
-	<string>Perch © 2026 Sarhan Alam Khan, based on Dynamic Ledge © 2026 Swagat Shandilya and Pritam Biswas. Free software under the GNU GPL, version 3 or later.</string>
+	<string>Peeko © 2026 Sarhan Alam Khan, based on Dynamic Ledge © 2026 Swagat Shandilya and Pritam Biswas. Free software under the GNU GPL, version 3 or later.</string>
 	<key>NSSupportsAutomaticGraphicsSwitching</key>
 	<true/>
 </dict>
